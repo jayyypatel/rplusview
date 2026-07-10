@@ -1,0 +1,127 @@
+"""First-run / change-user welcome modal."""
+
+from __future__ import annotations
+
+from textual import on
+from textual.app import ComposeResult
+from textual.containers import Horizontal, Vertical
+from textual.screen import ModalScreen
+from textual.widgets import Button, Input, Static
+
+from rplusview.config import get_saved_username
+from rplusview.github_client import has_token
+
+
+class SetupScreen(ModalScreen[str | None]):
+    """Collect GitHub username (and token if missing) before loading PRs."""
+
+    BINDINGS = [
+        ("escape", "cancel", "Cancel"),
+    ]
+
+    def __init__(self, *, first_run: bool = True) -> None:
+        super().__init__()
+        self.first_run = first_run
+        self._need_token = not has_token()
+
+    def compose(self) -> ComposeResult:
+        title = "Welcome to RPlusView" if self.first_run else "Switch GitHub user"
+        subtitle = (
+            "Enter a GitHub username to load their pull requests."
+            if self.first_run
+            else "Change which GitHub user RPlusView tracks."
+        )
+        saved = get_saved_username() or ""
+
+        with Vertical(id="setup-dialog"):
+            yield Static(f"[bold]◆  {title}[/bold]", id="setup-title")
+            yield Static(subtitle, id="setup-subtitle")
+            yield Static("GitHub username", id="setup-user-label")
+            yield Input(
+                value=saved,
+                placeholder="e.g. octocat",
+                id="setup-username",
+            )
+            if self._need_token:
+                yield Static(
+                    "Personal access token  [dim](needed once for API access)[/dim]",
+                    id="setup-token-label",
+                    markup=True,
+                )
+                yield Input(
+                    placeholder="ghp_… or github_pat_…",
+                    password=True,
+                    id="setup-token",
+                )
+                yield Static(
+                    "[dim]Create a token at github.com/settings/tokens "
+                    "with repo / read:user scope.[/dim]",
+                    id="setup-token-hint",
+                    markup=True,
+                )
+            yield Static("", id="setup-error")
+            with Horizontal(id="setup-actions"):
+                if not self.first_run:
+                    yield Button("Cancel", id="setup-cancel", flat=True, compact=True)
+                yield Button(
+                    "Continue →",
+                    id="setup-continue",
+                    variant="success",
+                    flat=True,
+                    compact=True,
+                )
+
+    def on_mount(self) -> None:
+        self.query_one("#setup-username", Input).focus()
+
+    @on(Input.Submitted, "#setup-username")
+    def on_username_submitted(self) -> None:
+        if self._need_token:
+            self.query_one("#setup-token", Input).focus()
+        else:
+            self._submit()
+
+    @on(Input.Submitted, "#setup-token")
+    def on_token_submitted(self) -> None:
+        self._submit()
+
+    @on(Button.Pressed, "#setup-continue")
+    def on_continue(self) -> None:
+        self._submit()
+
+    @on(Button.Pressed, "#setup-cancel")
+    def on_cancel_button(self) -> None:
+        self.action_cancel()
+
+    def action_cancel(self) -> None:
+        if self.first_run and not get_saved_username():
+            self.app.exit()
+            return
+        self.dismiss(None)
+
+    def _submit(self) -> None:
+        username = self.query_one("#setup-username", Input).value.strip()
+        error = self.query_one("#setup-error", Static)
+
+        if not username:
+            error.update("[bold red]Please enter a GitHub username.[/]")
+            self.query_one("#setup-username", Input).focus()
+            return
+
+        if " " in username or "/" in username:
+            error.update("[bold red]Username should be a single GitHub login.[/]")
+            self.query_one("#setup-username", Input).focus()
+            return
+
+        if self._need_token:
+            token = self.query_one("#setup-token", Input).value.strip()
+            if not token:
+                error.update("[bold red]A GitHub token is required to fetch data.[/]")
+                self.query_one("#setup-token", Input).focus()
+                return
+            from rplusview.config import save_config
+
+            save_config({"token": token})
+
+        error.update("")
+        self.dismiss(username)

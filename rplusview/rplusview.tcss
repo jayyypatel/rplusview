@@ -1,0 +1,338 @@
+/* RPlusView — polished GitHub dark theme */
+
+$gh-bg: #0b0f14;
+$gh-panel: #151b23;
+$gh-panel-2: #1c2330;
+$gh-border: #2d3643;
+$gh-accent: #3dd68c;
+$gh-accent-dim: #1a3d2e;
+$gh-muted: #8b9bb0;
+$gh-text: #e8eef7;
+$gh-cursor: #2f81f7;
+$gh-row-odd: #10161e;
+$gh-warn: #d29922;
+$gh-open: #3dd68c;
+$gh-merged: #a371f7;
+$gh-closed: #f85149;
+
+Screen {
+    background: $gh-bg;
+    color: $gh-text;
+    layout: vertical;
+}
+
+#title-bar {
+    height: 3;
+    background: $gh-panel;
+    color: $gh-accent;
+    content-align: center middle;
+    text-style: bold;
+    border-bottom: tall $gh-border;
+}
+
+ActionBar {
+    height: 3;
+    background: $gh-panel-2;
+    border-bottom: tall $gh-border;
+    padding: 0 1;
+    align: left middle;
+    layout: horizontal;
+}
+
+#action-label {
+    width: auto;
+    color: $gh-muted;
+    text-style: bold;
+    content-align: center middle;
+    padding: 0 1 0 0;
+}
+
+ActionBar Button {
+    margin: 0 1 0 0;
+    min-width: 10;
+    height: 1;
+    border: none;
+    background: $gh-panel;
+    color: $gh-text;
+}
+
+ActionBar Button:hover {
+    background: $gh-border;
+}
+
+ActionBar Button.-success {
+    background: $gh-accent-dim;
+    color: $gh-accent;
+    text-style: bold;
+}
+
+ActionBar Button.-success:hover {
+    background: #214d38;
+}
+
+ActionBar Button.-primary {
+    background: #163a66;
+    color: #79b8ff;
+    text-style: bold;
+}
+
+ActionBar Button.-primary:hover {
+    background: #1f4f8a;
+}
+
+ActionBar Button.-warning {
+    background: #3d2e12;
+    color: $gh-warn;
+    text-style: bold;
+}
+
+ActionBar Button.-warning:hover {
+    background: #5a4218;
+}
+
+#search-input {
+    height: 3;
+    margin: 0 1;
+    background: $gh-panel;
+    border: tall $gh-cursor;
+    color: $gh-text;
+}
+
+#body {
+    height: 1fr;
+    layout: vertical;
+    padding: 0 1 0 1;
+}
+
+#loading-pane {
+    height: 1fr;
+    align: center middle;
+    background: $gh-bg;
+}
+
+#loading-label {
+    margin-top: 1;
+    color: $gh-muted;
+    text-align: center;
+    width: 100%;
+}
+
+#pr-table,
+#repos-table {
+    height: 1fr;
+    background: $gh-bg;
+    border: tall $gh-border;
+}
+
+DataTable > .datatable--header {
+    background: $gh-panel;
+    color: $gh-muted;
+    text-style: bold;
+}
+
+DataTable > .datatable--cursor {
+    background: $gh-cursor;
+    color: $gh-text;
+}
+
+DataTable > .datatable--odd-row {
+    background: $gh-row-odd;
+}
+
+#status-bar {
+    height: 1;
+    dock: bottom;
+    background: $gh-panel;
+    color: $gh-muted;
+    content-align: left middle;
+    border-top: tall $gh-border;
+    padding: 0 1;
+}
+
+HelpScreen {
+    align: center middle;
+    background: rgba(2, 6, 12, 0.78);
+}
+
+SetupScreen {
+    align: center middle;
+    background: rgba(2, 6, 12, 0.82);
+}
+
+#setup-dialog {
+    width: 64;
+    height: auto;
+    background: $gh-panel;
+    border: tall $gh-accent;
+    padding: 1 2 1 2;
+}
+
+#setup-title {
+    text-align: center;
+    color: $gh-accent;
+    text-style: bold;
+    margin-bottom: 1;
+}
+
+#setup-subtitle {
+    text-align: center;
+    color: $gh-muted;
+    margin-bottom: 1;
+}
+
+#setup-user-label,
+#setup-token-label {
+    color: $gh-text;
+    text-style: bold;
+    margin-top: 1;
+}
+
+#setup-username,
+#setup-token {
+    margin-top: 1;
+    background: $gh-bg;
+    border: tall $gh-border;
+    color: $gh-text;
+}
+
+#setup-username:focus,
+#setup-token:focus {
+    border: tall $gh-accent;
+}
+
+#setup-token-hint {
+    margin-top: 1;
+    color: $gh-muted;
+}
+
+#setup-error {
+    margin-top: 1;
+    height: 1;
+    color: $gh-closed;
+}
+
+#setup-actions {
+    height: 3;
+    align: right middle;
+    margin-top: 1;
+}
+
+#setup-actions Button {
+    margin-left: 1;
+    min-width: 12;
+}
+
+#setup-continue {
+    background: $gh-accent-dim;
+    color: $gh-accent;
+    text-style: bold;
+}
+
+#help-dialog {
+    width: 74;
+    height: auto;
+    max-height: 90%;
+    background: $gh-panel;
+    border: tall $gh-accent;
+    padding: 1 2;
+}
+
+#help-title {
+    text-align: center;
+    color: $gh-accent;
+    text-style: bold;
+    margin-bottom: 1;
+}
+
+#help-scroll {
+    height: auto;
+    max-height: 30;
+}
+
+#help-body {
+    color: $gh-text;
+    height: auto;
+}
+
+#help-footer {
+    margin-top: 1;
+    text-align: center;
+    color: $gh-muted;
+}
+
+#detail-root {
+    height: 1fr;
+    layout: vertical;
+}
+
+#detail-loading {
+    height: 1fr;
+    align: center middle;
+}
+
+#detail-loading-label {
+    margin-top: 1;
+    color: $gh-muted;
+    text-align: center;
+    width: 100%;
+}
+
+#detail-scroll {
+    height: 1fr;
+    padding: 1 2;
+    background: $gh-bg;
+}
+
+#detail-header {
+    margin-bottom: 1;
+    color: $gh-text;
+}
+
+#detail-meta {
+    margin-bottom: 1;
+    padding: 1;
+    background: $gh-panel;
+    border: tall $gh-border;
+    height: auto;
+}
+
+#detail-body-label {
+    margin-top: 1;
+    color: $gh-accent;
+}
+
+#detail-body {
+    margin-top: 1;
+    color: $gh-muted;
+    height: auto;
+}
+
+#stats-body {
+    height: 1fr;
+    padding: 1 2;
+    layout: vertical;
+}
+
+#stats-overview {
+    height: auto;
+    margin-bottom: 1;
+    padding: 1;
+    background: $gh-panel;
+    border: tall $gh-border;
+}
+
+#stats-repos-label,
+#stats-large-label {
+    margin-top: 1;
+    color: $gh-accent;
+}
+
+#stats-top-repos {
+    height: 10;
+    border: tall $gh-border;
+}
+
+#stats-largest {
+    height: 1fr;
+    border: tall $gh-border;
+}

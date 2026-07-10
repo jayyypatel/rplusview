@@ -1,0 +1,57 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "rplusview"
+version = "1.0.0"
+description = "RPlusView — colorful terminal dashboard for GitHub pull requests"
+readme = "README.md"
+requires-python = ">=3.10"
+license = "MIT"
+authors = [{ name = "RPlusView" }]
+keywords = [
+    "github",
+    "pull-request",
+    "pr",
+    "tui",
+    "textual",
+    "cli",
+    "dashboard",
+    "rplusview",
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Environment :: Console",
+    "Intended Audience :: Developers",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Software Development :: Version Control :: Git",
+    "Topic :: Terminals",
+]
+dependencies = [
+    "textual>=0.80.0",
+    "requests>=2.31.0",
+]
+
+[project.optional-dependencies]
+dev = ["build", "twine"]
+
+[project.scripts]
+rplusview = "rplusview.app:main"
+
+[project.urls]
+Homepage = "https://github.com/jayp-odoo/github_plugin"
+Repository = "https://github.com/jayp-odoo/github_plugin"
+Issues = "https://github.com/jayp-odoo/github_plugin/issues"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["rplusview*"]
+
+[tool.setuptools.package-data]
+rplusview = ["*.tcss"]
