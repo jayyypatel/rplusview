@@ -41,52 +41,9 @@
 
 ## 📦 Install as a package
 
-### Option A — from this repo (recommended)
-
-```bash
-git clone https://github.com/YOUR_USER/github_plugin.git
-cd github_plugin
-pip install .
-```
-
-That installs the `rplusview` command globally (or into your active venv).
-
-### Option B — editable (for development)
-
-```bash
-git clone https://github.com/YOUR_USER/github_plugin.git
-cd github_plugin
-pip install -e .
-```
-
-Code changes apply immediately — no reinstall needed.
-
-### Option C — run without installing
-
-```bash
-cd github_plugin
-pip install textual requests
-python -m rplusview
-# or
-python app.py
-```
-
-### Option D — publish to PyPI (optional)
-
-```bash
-pip install build twine
-python -m build
-twine upload dist/*
-```
-
-Then anyone can install with:
-
 ```bash
 pip install rplusview
 ```
-
-> Replace `YOUR_USER` with your GitHub username/org, and update
-> `[project.urls]` in `pyproject.toml` before publishing.
 
 ---
 
@@ -179,28 +136,10 @@ with at least **`repo`** (or public_repo) access for searching PRs.
 
 ---
 
-## 🛠️ Develop
-
-```bash
-python -m venv .venv
-source .venv/bin/activate   # Windows: .venv\Scripts\activate
-pip install -e .
-rplusview
-```
-
-Build a distributable wheel locally:
-
-```bash
-pip install build
-python -m build
-ls dist/   # rplusview-1.0.0-py3-none-any.whl
-```
-
----
 
 ## 💜 Why RPlusView?
 
-Because your PRs deserve a dashboard that feels as sharp as your code —  
+Because your PRs deserve a dashboard that feels as sharp as your code 
 fast, colorful, and living right inside the terminal.
 
 <p align="center">
