@@ -8,7 +8,7 @@
 ██║  ██║██║     ███████╗╚██████╔╝███████║ ╚████╔╝ ██║███████╗╚███╔███╔╝
 ╚═╝  ╚═╝╚═╝     ╚══════╝ ╚═════╝ ╚══════╝  ╚═══╝  ╚═╝╚══════╝ ╚══╝╚══╝
 ```
-
+![Dashboard](https://raw.githubusercontent.com/jayp-odoo/RPlusview_plugin/refs/heads/main/photos/screenshot_app.png?token=GHSAT0AAAAAADOCBULCO57FAM22R56WRUSM2SR7PNQ)
 </p>
 
 <p align="center">
