@@ -33,6 +33,17 @@ query($query: String!, $cursor: String) {
         author {
           login
         }
+        comments {
+          totalCount
+        }
+        reviewThreads(first: 100) {
+          totalCount
+          nodes {
+            comments {
+              totalCount
+            }
+          }
+        }
         repository {
           nameWithOwner
           url
@@ -73,11 +84,46 @@ query($owner: String!, $name: String!, $number: Int!) {
       commits {
         totalCount
       }
-      comments {
+      comments(first: 40) {
         totalCount
+        nodes {
+          author {
+            login
+          }
+          body
+          createdAt
+          url
+        }
       }
-      reviews {
+      reviewThreads(first: 100) {
         totalCount
+        nodes {
+          isResolved
+          comments(first: 30) {
+            totalCount
+            nodes {
+              author {
+                login
+              }
+              body
+              createdAt
+              url
+              path
+              line
+            }
+          }
+        }
+      }
+      reviews(first: 30) {
+        totalCount
+        nodes {
+          author {
+            login
+          }
+          body
+          state
+          createdAt
+        }
       }
       repository {
         nameWithOwner
@@ -243,6 +289,48 @@ def pr_status(pr: dict[str, Any]) -> str:
 
 def pr_loc(pr: dict[str, Any]) -> int:
     return int(pr.get("additions", 0)) + int(pr.get("deletions", 0))
+
+
+def pr_issue_comments(pr: dict[str, Any]) -> int:
+    comments = pr.get("comments")
+    if isinstance(comments, dict):
+        return int(comments.get("totalCount") or 0)
+    return int(comments or 0)
+
+
+def pr_review_comments(pr: dict[str, Any]) -> int:
+    """Inline review comments (code comments), via review threads."""
+    threads = pr.get("reviewThreads")
+    if not isinstance(threads, dict):
+        return 0
+    nodes = threads.get("nodes")
+    if nodes:
+        total = 0
+        for thread in nodes:
+            comments = (thread or {}).get("comments") or {}
+            total += int(comments.get("totalCount") or 0)
+        return total
+    # Fallback when only thread count is available
+    return int(threads.get("totalCount") or 0)
+
+
+def pr_comments(pr: dict[str, Any]) -> int:
+    """Total comments matching GitHub UI: conversation + inline review."""
+    return pr_issue_comments(pr) + pr_review_comments(pr)
+
+
+def iter_review_comments(pr: dict[str, Any]) -> list[dict[str, Any]]:
+    """Flatten inline review-thread comments for the details page."""
+    out: list[dict[str, Any]] = []
+    threads = (pr.get("reviewThreads") or {}).get("nodes") or []
+    for thread in threads:
+        resolved = bool((thread or {}).get("isResolved"))
+        for node in ((thread or {}).get("comments") or {}).get("nodes") or []:
+            item = dict(node)
+            item["_resolved"] = resolved
+            out.append(item)
+    return out
+
 
 
 def search_prs(prs: list[dict[str, Any]], query: str = "") -> list[dict[str, Any]]:

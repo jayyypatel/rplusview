@@ -18,6 +18,7 @@ from rplusview.github_client import (
     SORT_MODES,
     get_prs,
     get_username,
+    pr_comments,
     pr_loc,
     pr_status,
     search_prs,
@@ -36,6 +37,16 @@ def _status_cell(status: str) -> Text:
 def _diff_cell(value: int, sign: str) -> Text:
     style = "#3fb950" if sign == "+" else "#f85149"
     return Text(f"{sign}{value}", style=style)
+
+
+def _comments_cell(count: int) -> Text:
+    if count <= 0:
+        return Text("0", style="#8b9bb0")
+    if count < 5:
+        return Text(str(count), style="bold #58a6ff")
+    if count < 15:
+        return Text(str(count), style="bold #d29922")
+    return Text(str(count), style="bold #f778ba")
 
 
 class RPlusView(App):
@@ -92,6 +103,7 @@ class RPlusView(App):
             "-",
             "LOC",
             "Files",
+            "Comments",
             "Status",
             "Created",
         )
@@ -280,6 +292,7 @@ class RPlusView(App):
                 _diff_cell(pr["deletions"], "-"),
                 str(pr_loc(pr)),
                 str(pr["changedFiles"]),
+                _comments_cell(pr_comments(pr)),
                 _status_cell(status),
                 pr["createdAt"][:10],
                 key=pr["url"],

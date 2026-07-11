@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 import webbrowser
 from typing import Any
 
@@ -17,7 +18,11 @@ from rplusview.github_client import (
     compute_stats,
     get_pr_detail,
     group_by_repo,
+    iter_review_comments,
+    pr_comments,
+    pr_issue_comments,
     pr_loc,
+    pr_review_comments,
     pr_status,
 )
 from rplusview.widget.help_screen import HelpScreen
@@ -28,6 +33,118 @@ from rplusview.widget.title_bar import TitleBar
 def _open_url(url: str) -> None:
     if url:
         webbrowser.open(url)
+
+
+def _escape_markup(text: str) -> str:
+    """Escape Rich markup brackets in user content."""
+    return text.replace("[", "\\[")
+
+
+def _trim_body(text: str, limit: int = 600) -> str:
+    text = (text or "").strip()
+    text = re.sub(r"\n{3,}", "\n\n", text)
+    if len(text) > limit:
+        return text[:limit].rstrip() + "…"
+    return text
+
+
+def _format_comments(pr: dict[str, Any]) -> str:
+    comments = (pr.get("comments") or {}).get("nodes") or []
+    issue_n = pr_issue_comments(pr)
+    if not comments:
+        if issue_n:
+            return (
+                f"[bold #58a6ff]{issue_n}[/] conversation comments on GitHub "
+                f"[dim](open in browser to read all)[/]"
+            )
+        return "[dim]No conversation comments yet.[/]"
+
+    blocks: list[str] = []
+    for i, node in enumerate(comments, start=1):
+        author = (node.get("author") or {}).get("login") or "unknown"
+        created = str(node.get("createdAt") or "")[:10]
+        body = _escape_markup(_trim_body(node.get("body") or ""))
+        if not body:
+            body = "[dim]_empty comment_[/]"
+        blocks.append(
+            f"[bold #58a6ff]#{i}[/]  [bold #3dd68c]@{author}[/]  "
+            f"[dim]{created}[/]\n"
+            f"[#c9d1d9]{body}[/]"
+        )
+    more = ""
+    if issue_n > len(comments):
+        more = (
+            f"\n\n[dim]Showing {len(comments)} of {issue_n} conversation comments — "
+            f"press o to open the rest in browser[/]"
+        )
+    return "\n\n".join(blocks) + more
+
+
+def _format_inline_comments(pr: dict[str, Any]) -> str:
+    nodes = iter_review_comments(pr)
+    review_n = pr_review_comments(pr)
+    if not nodes:
+        if review_n:
+            return (
+                f"[bold #d29922]{review_n}[/] inline review comments on GitHub "
+                f"[dim](open in browser to read all)[/]"
+            )
+        return "[dim]No inline review comments yet.[/]"
+
+    blocks: list[str] = []
+    for i, node in enumerate(nodes[:40], start=1):
+        author = (node.get("author") or {}).get("login") or "unknown"
+        created = str(node.get("createdAt") or "")[:10]
+        path = node.get("path") or ""
+        line = node.get("line")
+        loc = f"{path}:{line}" if path and line else path or "diff"
+        resolved = " [dim]resolved[/]" if node.get("_resolved") else ""
+        body = _escape_markup(_trim_body(node.get("body") or "", 450))
+        if not body:
+            body = "[dim]_empty comment_[/]"
+        blocks.append(
+            f"[bold #d29922]#{i}[/]  [bold #3dd68c]@{author}[/]  "
+            f"[#79c0ff]{loc}[/]{resolved}  [dim]{created}[/]\n"
+            f"[#c9d1d9]{body}[/]"
+        )
+    more = ""
+    if review_n > len(nodes[:40]):
+        more = (
+            f"\n\n[dim]Showing {min(len(nodes), 40)} of {review_n} inline comments — "
+            f"press o for the rest[/]"
+        )
+    return "\n\n".join(blocks) + more
+
+
+def _format_reviews(pr: dict[str, Any]) -> str:
+    reviews = (pr.get("reviews") or {}).get("nodes") or []
+    total = (pr.get("reviews") or {}).get("totalCount", 0)
+    useful = [r for r in reviews if (r.get("body") or "").strip()]
+    if not useful:
+        if total:
+            return f"[dim]{total} review(s) — no written review bodies[/]"
+        return "[dim]No reviews yet.[/]"
+
+    state_colors = {
+        "APPROVED": "#3dd68c",
+        "CHANGES_REQUESTED": "#f85149",
+        "COMMENTED": "#58a6ff",
+        "DISMISSED": "#8b9bb0",
+        "PENDING": "#d29922",
+    }
+    blocks: list[str] = []
+    for node in useful[:15]:
+        author = (node.get("author") or {}).get("login") or "unknown"
+        state = node.get("state") or "COMMENTED"
+        color = state_colors.get(state, "#8b9bb0")
+        created = str(node.get("createdAt") or "")[:10]
+        body = _escape_markup(_trim_body(node.get("body") or "", 400))
+        blocks.append(
+            f"[bold {color}]● {state}[/]  [bold #a371f7]@{author}[/]  "
+            f"[dim]{created}[/]\n"
+            f"[#c9d1d9]{body}[/]"
+        )
+    return "\n\n".join(blocks)
 
 
 class PRDetailScreen(Screen):
@@ -55,6 +172,12 @@ class PRDetailScreen(Screen):
                 yield Static("", id="detail-meta", markup=True)
                 yield Static("[bold]Description[/bold]", id="detail-body-label", markup=True)
                 yield Static("", id="detail-body", markup=True)
+                yield Static("", id="detail-comments-label", markup=True)
+                yield Static("", id="detail-comments", markup=True)
+                yield Static("", id="detail-inline-label", markup=True)
+                yield Static("", id="detail-inline", markup=True)
+                yield Static("", id="detail-reviews-label", markup=True)
+                yield Static("", id="detail-reviews", markup=True)
         yield StatusBar()
 
     def on_mount(self) -> None:
@@ -79,32 +202,63 @@ class PRDetailScreen(Screen):
         body = (pr.get("body") or "").strip() or "_No description provided._"
         if len(body) > 4000:
             body = body[:4000] + "\n\n…"
+        body = _escape_markup(body)
 
         repo = pr.get("repository", {}).get("nameWithOwner") or "—"
         commits = (pr.get("commits") or {}).get("totalCount", "—")
-        comments = (pr.get("comments") or {}).get("totalCount", "—")
-        reviews = (pr.get("reviews") or {}).get("totalCount", "—")
+        issue_n = pr_issue_comments(pr)
+        review_n = pr_review_comments(pr)
+        comments_n = issue_n + review_n
+        reviews_n = (pr.get("reviews") or {}).get("totalCount", 0)
+
+        status_color = {
+            "Open": "#3dd68c",
+            "Merged": "#a371f7",
+            "Closed": "#f85149",
+        }.get(status, "#8b9bb0")
 
         self.query_one("#detail-header", Static).update(
-            f"[bold]{pr.get('title', '')}[/bold]\n"
-            f"[dim]{repo} · #{pr.get('number')} · {status}[/dim]"
+            f"[bold]{_escape_markup(pr.get('title', ''))}[/bold]\n"
+            f"[dim]{repo} · #{pr.get('number')} · [/]"
+            f"[bold {status_color}]{status}[/]"
         )
         self.query_one("#detail-meta", Static).update(
-            f"[bold green]Author[/]  {author}\n"
-            f"[bold green]Branch[/]  {pr.get('headRefName', '—')} → {pr.get('baseRefName', '—')}\n"
-            f"[bold green]Diff[/]    [green]+{pr.get('additions', 0)}[/]  "
+            f"[bold #3dd68c]Author[/]    [bold]@{author}[/]\n"
+            f"[bold #3dd68c]Branch[/]    {pr.get('headRefName', '—')} → {pr.get('baseRefName', '—')}\n"
+            f"[bold #3dd68c]Diff[/]      [green]+{pr.get('additions', 0)}[/]  "
             f"[red]-{pr.get('deletions', 0)}[/]  ·  "
             f"{pr.get('changedFiles', 0)} files  ·  LOC {pr_loc(pr)}\n"
-            f"[bold green]Activity[/] {commits} commits · {reviews} reviews · {comments} comments\n"
-            f"[bold green]Labels[/]  {labels}\n"
-            f"[bold green]Created[/] {str(pr.get('createdAt') or '')[:10]}   "
-            f"[bold green]Updated[/] {str(pr.get('updatedAt') or '')[:10]}\n"
-            f"[bold green]URL[/]     {pr.get('url', '')}"
+            f"[bold #3dd68c]Activity[/]  [bold #d29922]{commits}[/] commits · "
+            f"[bold #a371f7]{reviews_n}[/] reviews · "
+            f"[bold #58a6ff]{comments_n}[/] comments "
+            f"[dim]({issue_n} conversation + {review_n} inline)[/]\n"
+            f"[bold #3dd68c]Labels[/]    {labels}\n"
+            f"[bold #3dd68c]Created[/]   {str(pr.get('createdAt') or '')[:10]}   "
+            f"[bold #3dd68c]Updated[/] {str(pr.get('updatedAt') or '')[:10]}\n"
+            f"[bold #3dd68c]URL[/]       [#58a6ff]{pr.get('url', '')}[/]"
         )
         self.query_one("#detail-body", Static).update(body)
+
+        self.query_one("#detail-comments-label", Static).update(
+            f"[bold #58a6ff]Conversation comments[/]  [dim]({issue_n})[/]"
+        )
+        self.query_one("#detail-comments", Static).update(_format_comments(pr))
+
+        self.query_one("#detail-inline-label", Static).update(
+            f"[bold #d29922]Inline review comments[/]  [dim]({review_n})[/]"
+        )
+        self.query_one("#detail-inline", Static).update(_format_inline_comments(pr))
+
+        self.query_one("#detail-reviews-label", Static).update(
+            f"[bold #a371f7]Reviews[/]  [dim]({reviews_n})[/]"
+        )
+        self.query_one("#detail-reviews", Static).update(_format_reviews(pr))
+
         self.query_one("#detail-loading").display = False
         self.query_one("#detail-scroll").display = True
-        self.query_one(TitleBar).set_meta(f"PR #{pr.get('number')} · {status}")
+        self.query_one(TitleBar).set_meta(
+            f"PR #{pr.get('number')} · {status} · {comments_n} comments"
+        )
 
     def action_go_back(self) -> None:
         self.app.pop_screen()

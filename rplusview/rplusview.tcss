@@ -303,8 +303,49 @@ SetupScreen {
 
 #detail-body {
     margin-top: 1;
+    margin-bottom: 1;
+    padding: 1;
+    background: $gh-panel;
+    border: tall $gh-border;
     color: $gh-muted;
     height: auto;
+}
+
+#detail-comments-label,
+#detail-inline-label,
+#detail-reviews-label {
+    margin-top: 1;
+    color: $gh-text;
+}
+
+#detail-comments {
+    margin-top: 1;
+    margin-bottom: 1;
+    padding: 1;
+    background: #0f1a28;
+    border: tall #1f4b7a;
+    height: auto;
+    color: $gh-text;
+}
+
+#detail-inline {
+    margin-top: 1;
+    margin-bottom: 1;
+    padding: 1;
+    background: #1a160c;
+    border: tall #6b4f14;
+    height: auto;
+    color: $gh-text;
+}
+
+#detail-reviews {
+    margin-top: 1;
+    margin-bottom: 1;
+    padding: 1;
+    background: #16122a;
+    border: tall #4b3a78;
+    height: auto;
+    color: $gh-text;
 }
 
 #stats-body {
