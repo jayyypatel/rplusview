@@ -50,3 +50,8 @@ def get_saved_username() -> str | None:
 
 def set_saved_username(username: str) -> None:
     save_config({"username": username.strip()})
+
+
+def set_saved_token(token: str) -> None:
+    """Persist token to config (takes precedence over env on next read)."""
+    save_config({"token": token.strip()})

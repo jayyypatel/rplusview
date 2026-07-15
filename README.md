@@ -34,8 +34,10 @@
 | 🔍 | **Live search** across title, repo, PR number & status |
 | 📊 | **Stats & repos views** with LOC, open/merged/closed breakdowns |
 | 🌐 | **Open in browser** for PRs and repositories |
-| ⌨️ | **Toolbar buttons + shortcuts** — everything is one key away |
-| 🔄 | **Switch user anytime** with the User button (`u`) |
+| ⌨️ | **Toolbar buttons + shortcuts** — vim `j`/`k` nav, everything is one key away |
+| 🔄 | **Switch user / token anytime** with the User button (`u`) |
+| 📥 | **Inbox panels** — drafts, needs action, review requests (like GitHub Pulls) |
+| ⚡ | **Open PRs first** — faster load; toggle Closed when you need history |
 
 ---
 
@@ -84,20 +86,26 @@ That username is saved in `~/.config/rplusview/config.json`.
 
 ### Toolbar
 
-`Open` · `Details` · `Stats` · `Repos` · `Search` · `Sort` · `Refresh` · `User` · `Help`
+`Open` · `Details` · `Inbox` · `Closed` · `Stats` · `Repos` · `Search` · `Sort` · `Refresh` · `User` · `Help`
 
 ### Keyboard
 
 | Key | Action |
 |:---:|--------|
-| `↑` `↓` | Navigate rows |
+| `j` `k` / `↑` `↓` | Navigate rows (vim-style) |
+| `gg` / `G` | First row / last row |
+| `ctrl+d` / `ctrl+u` | Half page down / up |
+| `ctrl+f` / `ctrl+b` | Full page down / up |
+| `n` / `N` | Next / previous search match |
 | `Enter` / `d` | PR details |
 | `o` | Open in browser |
+| `i` | Inbox (drafts · needs action · review requests) |
+| `c` | Toggle open ↔ closed/merged PRs |
 | `/` | Live search |
 | `s` | Cycle sort (LOC → Date → Title → Repo → Files → #) |
 | `t` | Statistics |
 | `e` | Repositories |
-| `u` | Change user |
+| `u` | Change user and/or API token |
 | `r` | Refresh |
 | `?` | Help |
 | `Esc` | Clear search / go back |
@@ -128,8 +136,10 @@ github_plugin/
 
 | What | Where |
 |------|--------|
-| GitHub token | `GITHUB_TOKEN` env var or `.env` |
-| Tracked username | first-run UI → `~/.config/rplusview/config.json` |
+| GitHub token | User button (`u`) · or `~/.config/rplusview/config.json` · or `GITHUB_TOKEN` / `.env` |
+| Tracked username | User button (`u`) → `~/.config/rplusview/config.json` |
+
+Token saved via the UI is preferred over env/`.env`, so you can fix a wrong token without reinstalling.
 
 Create a classic PAT at [github.com/settings/tokens](https://github.com/settings/tokens)  
 with at least **`repo`** (or public_repo) access for searching PRs.

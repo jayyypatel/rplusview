@@ -7,12 +7,12 @@ import webbrowser
 from typing import Any
 
 from rich.text import Text
-from textual import work
+from textual import on, work
 from textual.app import ComposeResult
 from textual.binding import Binding
 from textual.containers import Vertical, VerticalScroll
 from textual.screen import Screen
-from textual.widgets import DataTable, LoadingIndicator, Static
+from textual.widgets import LoadingIndicator, Static
 
 from rplusview.github_client import (
     compute_stats,
@@ -25,10 +25,21 @@ from rplusview.github_client import (
     pr_review_comments,
     pr_status,
 )
+from rplusview.screens.inbox import InboxScreen
 from rplusview.widget.help_screen import HelpScreen
 from rplusview.widget.status_bar import StatusBar
 from rplusview.widget.title_bar import TitleBar
+from rplusview.widget.vim_nav import (
+    VIM_NAV_BINDINGS,
+    VimDataTable,
+    VimNavMixin,
+    vim_scroll_bottom,
+    vim_scroll_half_down,
+    vim_scroll_half_up,
+    vim_scroll_top,
+)
 
+__all__ = ["InboxScreen", "PRDetailScreen", "ReposScreen", "StatsScreen"]
 
 def _open_url(url: str) -> None:
     if url:
@@ -155,6 +166,14 @@ class PRDetailScreen(Screen):
         Binding("q", "go_back", "Back", show=False),
         Binding("o", "open_browser", "Browser", show=False),
         Binding("question_mark", "help", "Help", show=False),
+        Binding("g,g", "scroll_top", "Top", show=False, priority=True),
+        Binding("G", "scroll_bottom", "Bottom", show=False, priority=True),
+        Binding("ctrl+d", "scroll_half_down", "Half↓", show=False, priority=True),
+        Binding("ctrl+u", "scroll_half_up", "Half↑", show=False, priority=True),
+        Binding("ctrl+f", "scroll_page_down", "Page↓", show=False, priority=True),
+        Binding("ctrl+b", "scroll_page_up", "Page↑", show=False, priority=True),
+        Binding("j", "scroll_line_down", "Down", show=False, priority=True),
+        Binding("k", "scroll_line_up", "Up", show=False, priority=True),
     ]
 
     def __init__(self, pr: dict[str, Any]) -> None:
@@ -183,9 +202,53 @@ class PRDetailScreen(Screen):
     def on_mount(self) -> None:
         self.query_one("#detail-scroll").display = False
         self.query_one(StatusBar).set_message(
-            " Esc/q Back   o Open in browser   ? Help "
+            " j/k gg G  ctrl+d/u  ctrl+f/b scroll   o Open   Esc/q Back   ? Help "
         )
         self.fetch_detail()
+
+    def _detail_scroll(self) -> VerticalScroll | None:
+        scroll = self.query_one("#detail-scroll", VerticalScroll)
+        return scroll if scroll.display else None
+
+    def action_scroll_top(self) -> None:
+        scroll = self._detail_scroll()
+        if scroll:
+            vim_scroll_top(scroll)
+
+    def action_scroll_bottom(self) -> None:
+        scroll = self._detail_scroll()
+        if scroll:
+            vim_scroll_bottom(scroll)
+
+    def action_scroll_half_down(self) -> None:
+        scroll = self._detail_scroll()
+        if scroll:
+            vim_scroll_half_down(scroll)
+
+    def action_scroll_half_up(self) -> None:
+        scroll = self._detail_scroll()
+        if scroll:
+            vim_scroll_half_up(scroll)
+
+    def action_scroll_page_down(self) -> None:
+        scroll = self._detail_scroll()
+        if scroll:
+            scroll.scroll_page_down()
+
+    def action_scroll_page_up(self) -> None:
+        scroll = self._detail_scroll()
+        if scroll:
+            scroll.scroll_page_up()
+
+    def action_scroll_line_down(self) -> None:
+        scroll = self._detail_scroll()
+        if scroll:
+            scroll.scroll_relative(y=1, animate=False)
+
+    def action_scroll_line_up(self) -> None:
+        scroll = self._detail_scroll()
+        if scroll:
+            scroll.scroll_relative(y=-1, animate=False)
 
     @work(exclusive=True, thread=True)
     def fetch_detail(self) -> None:
@@ -271,13 +334,14 @@ class PRDetailScreen(Screen):
         self.app.push_screen(HelpScreen())
 
 
-class StatsScreen(Screen):
+class StatsScreen(VimNavMixin, Screen):
     """Aggregate statistics across loaded PRs."""
 
     BINDINGS = [
         Binding("escape", "go_back", "Back", show=False),
         Binding("q", "go_back", "Back", show=False),
         Binding("question_mark", "help", "Help", show=False),
+        *VIM_NAV_BINDINGS,
     ]
 
     def __init__(self, prs: list[dict[str, Any]]) -> None:
@@ -303,21 +367,21 @@ class StatsScreen(Screen):
                 markup=True,
             )
             yield Static("[bold]Top repositories[/bold]", id="stats-repos-label", markup=True)
-            yield DataTable(id="stats-top-repos")
+            yield VimDataTable(id="stats-top-repos")
             yield Static("[bold]Largest PRs by LOC[/bold]", id="stats-large-label", markup=True)
-            yield DataTable(id="stats-largest")
+            yield VimDataTable(id="stats-largest")
         yield StatusBar()
 
     def on_mount(self) -> None:
         stats = compute_stats(self.prs)
-        repos = self.query_one("#stats-top-repos", DataTable)
+        repos = self.query_one("#stats-top-repos", VimDataTable)
         repos.cursor_type = "row"
         repos.zebra_stripes = True
         repos.add_columns("Repository", "PRs")
         for name, count in stats["top_repos"]:
             repos.add_row(name, str(count))
 
-        largest = self.query_one("#stats-largest", DataTable)
+        largest = self.query_one("#stats-largest", VimDataTable)
         largest.cursor_type = "row"
         largest.zebra_stripes = True
         largest.add_columns("#", "Repository", "Title", "LOC", "Status")
@@ -331,10 +395,24 @@ class StatsScreen(Screen):
                 key=pr["url"],
             )
 
-        self.query_one(StatusBar).set_message(" Esc/q Back   ? Help ")
+        self.query_one(StatusBar).set_message(
+            " j/k gg G  ctrl+d/u  Esc/q Back   ? Help "
+        )
         self.query_one(TitleBar).set_meta(
             f"{stats['total']} PRs · {stats['open']} open · {len(stats['repos'])} repos"
         )
+
+    def _vim_table(self) -> VimDataTable | None:
+        focused = self.focused
+        if isinstance(focused, VimDataTable) and focused.row_count:
+            return focused
+        largest = self.query_one("#stats-largest", VimDataTable)
+        if largest.row_count:
+            return largest
+        repos = self.query_one("#stats-top-repos", VimDataTable)
+        if repos.row_count:
+            return repos
+        return None
 
     def action_go_back(self) -> None:
         self.app.pop_screen()
@@ -343,7 +421,7 @@ class StatsScreen(Screen):
         self.app.push_screen(HelpScreen())
 
 
-class ReposScreen(Screen):
+class ReposScreen(VimNavMixin, Screen):
     """Per-repository breakdown of pull requests."""
 
     BINDINGS = [
@@ -351,6 +429,7 @@ class ReposScreen(Screen):
         Binding("q", "go_back", "Back", show=False),
         Binding("o", "open_browser", "Browser", show=False),
         Binding("question_mark", "help", "Help", show=False),
+        *VIM_NAV_BINDINGS,
     ]
 
     def __init__(self, prs: list[dict[str, Any]]) -> None:
@@ -360,11 +439,11 @@ class ReposScreen(Screen):
 
     def compose(self) -> ComposeResult:
         yield TitleBar("RPlusView", "repositories")
-        yield DataTable(id="repos-table")
+        yield VimDataTable(id="repos-table")
         yield StatusBar()
 
     def on_mount(self) -> None:
-        table = self.query_one("#repos-table", DataTable)
+        table = self.query_one("#repos-table", VimDataTable)
         table.cursor_type = "row"
         table.zebra_stripes = True
         table.add_columns("Repository", "PRs", "Open", "Merged", "Closed", "LOC")
@@ -380,12 +459,19 @@ class ReposScreen(Screen):
             )
         self.query_one(TitleBar).set_meta(f"{len(self._repos)} repositories")
         self.query_one(StatusBar).set_message(
-            " ↑↓ Nav   Enter/o Open repo   Esc/q Back   ? Help "
+            " j/k gg G  ctrl+d/u  Enter/o Open repo   Esc/q Back   ? Help "
         )
         if self._repos:
             table.focus()
 
-    def on_data_table_row_selected(self, event: DataTable.RowSelected) -> None:
+    def _vim_table(self) -> VimDataTable | None:
+        table = self.query_one("#repos-table", VimDataTable)
+        if table.row_count:
+            return table
+        return None
+
+    @on(VimDataTable.RowSelected, "#repos-table")
+    def on_data_table_row_selected(self, event: VimDataTable.RowSelected) -> None:
         _open_url(str(event.row_key.value))
         self.notify("Opened repository in browser", timeout=2)
 
@@ -393,7 +479,7 @@ class ReposScreen(Screen):
         self.app.pop_screen()
 
     def action_open_browser(self) -> None:
-        table = self.query_one("#repos-table", DataTable)
+        table = self.query_one("#repos-table", VimDataTable)
         if table.row_count == 0:
             return
         row_key, _ = table.coordinate_to_cell_key(table.cursor_coordinate)

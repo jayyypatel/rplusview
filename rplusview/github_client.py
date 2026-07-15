@@ -5,11 +5,13 @@ from __future__ import annotations
 import os
 from collections import Counter
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
 import requests
 
 API_URL = "https://api.github.com/graphql"
+
+PR_StateFilter = Literal["open", "closed", "all"]
 
 LIST_QUERY = """
 query($query: String!, $cursor: String) {
@@ -28,6 +30,9 @@ query($query: String!, $cursor: String) {
         changedFiles
         state
         merged
+        isDraft
+        mergeable
+        reviewDecision
         createdAt
         updatedAt
         author {
@@ -41,6 +46,26 @@ query($query: String!, $cursor: String) {
           nodes {
             comments {
               totalCount
+            }
+          }
+        }
+        commits(last: 1) {
+          nodes {
+            commit {
+              statusCheckRollup {
+                state
+                contexts(first: 40) {
+                  nodes {
+                    ... on CheckRun {
+                      status
+                      conclusion
+                    }
+                    ... on StatusContext {
+                      state
+                    }
+                  }
+                }
+              }
             }
           }
         }
@@ -67,6 +92,9 @@ query($owner: String!, $name: String!, $number: Int!) {
       changedFiles
       state
       merged
+      isDraft
+      mergeable
+      reviewDecision
       createdAt
       updatedAt
       mergedAt
@@ -134,6 +162,16 @@ query($owner: String!, $name: String!, $number: Int!) {
 }
 """
 
+# Inbox panel keys in GitHub Pulls-style order
+INBOX_SECTIONS = (
+    ("needs_review", "Needs your review"),
+    ("needs_team_review", "Needs your teams' review"),
+    ("drafts", "Your drafts"),
+    ("waiting", "Waiting for review or checks"),
+    ("needs_action", "Needs action"),
+    ("ready", "Ready to merge"),
+)
+
 
 def _load_dotenv() -> None:
     candidates = [
@@ -155,15 +193,15 @@ def _load_dotenv() -> None:
 
 
 def get_token() -> str | None:
-    """Resolve GitHub token from env, .env, or saved config."""
-    _load_dotenv()
-    token = os.environ.get("GITHUB_TOKEN") or os.environ.get("GH_TOKEN")
-    if token:
-        return token.strip()
+    """Resolve GitHub token: saved config first (UI-updated), then env / .env."""
     from rplusview.config import load_config
 
     saved = (load_config().get("token") or "").strip()
-    return saved or None
+    if saved:
+        return saved
+    _load_dotenv()
+    token = os.environ.get("GITHUB_TOKEN") or os.environ.get("GH_TOKEN")
+    return token.strip() if token else None
 
 
 def has_token() -> bool:
@@ -224,13 +262,18 @@ def _post_graphql(headers: dict[str, str], payload: dict[str, Any]) -> dict[str,
     raise RuntimeError(f"GitHub request failed: {last_error}")
 
 
-def get_prs(author: str | None = None) -> list[dict[str, Any]]:
-    username = author or get_username()
-    if not username:
-        raise RuntimeError("No GitHub username configured.")
+def _search_query(username: str, state: PR_StateFilter) -> str:
+    base = f"author:{username} type:pr"
+    if state == "open":
+        return f"{base} is:open"
+    if state == "closed":
+        return f"{base} is:closed"
+    return base
+
+
+def _search_prs(search_query: str) -> list[dict[str, Any]]:
     token = require_token()
     headers = _headers(token)
-
     prs: list[dict[str, Any]] = []
     cursor = None
 
@@ -240,7 +283,7 @@ def get_prs(author: str | None = None) -> list[dict[str, Any]]:
             {
                 "query": LIST_QUERY,
                 "variables": {
-                    "query": f"author:{username} type:pr",
+                    "query": search_query,
                     "cursor": cursor,
                 },
             },
@@ -253,6 +296,140 @@ def get_prs(author: str | None = None) -> list[dict[str, Any]]:
         cursor = search["pageInfo"]["endCursor"]
 
     return prs
+
+
+def get_prs(
+    author: str | None = None,
+    *,
+    state: PR_StateFilter = "open",
+) -> list[dict[str, Any]]:
+    """Fetch PRs for an author. Defaults to open-only for faster first load."""
+    username = author or get_username()
+    if not username:
+        raise RuntimeError("No GitHub username configured.")
+    return _search_prs(_search_query(username, state))
+
+
+def get_inbox(author: str | None = None) -> dict[str, list[dict[str, Any]]]:
+    """Fetch and categorize PRs into a GitHub Pulls-style inbox."""
+    username = author or get_username()
+    if not username:
+        raise RuntimeError("No GitHub username configured.")
+
+    authored_open = _search_prs(f"author:{username} type:pr is:open")
+    try:
+        review_requested = _search_prs(f"review-requested:{username} type:pr is:open")
+    except Exception:  # noqa: BLE001
+        review_requested = []
+
+    return categorize_inbox(authored_open, review_requested, username=username)
+
+
+def categorize_inbox(
+    authored_open: list[dict[str, Any]],
+    review_requested: list[dict[str, Any]],
+    *,
+    username: str,
+) -> dict[str, list[dict[str, Any]]]:
+    """Split open PRs into inbox panels (mutually exclusive for authored)."""
+    drafts: list[dict[str, Any]] = []
+    waiting: list[dict[str, Any]] = []
+    needs_action: list[dict[str, Any]] = []
+    ready: list[dict[str, Any]] = []
+
+    for pr in authored_open:
+        if pr.get("isDraft"):
+            drafts.append(pr)
+            continue
+        decision = pr.get("reviewDecision")
+        mergeable = pr.get("mergeable")
+        if mergeable == "CONFLICTING" or decision == "CHANGES_REQUESTED":
+            needs_action.append(pr)
+        elif decision == "APPROVED":
+            ready.append(pr)
+        else:
+            waiting.append(pr)
+
+    user_l = username.lower()
+    needs_review = [
+        pr
+        for pr in review_requested
+        if ((pr.get("author") or {}).get("login") or "").lower() != user_l
+    ]
+
+    return {
+        "needs_review": needs_review,
+        "needs_team_review": [],  # needs org/team membership; reserved for UI parity
+        "drafts": drafts,
+        "waiting": waiting,
+        "needs_action": needs_action,
+        "ready": ready,
+    }
+
+
+def inbox_action_label(pr: dict[str, Any], *, section: str) -> str:
+    """Short status label like GitHub's Pulls inbox."""
+    if section == "drafts" or pr.get("isDraft"):
+        return "Not ready"
+    if pr.get("mergeable") == "CONFLICTING":
+        return "Merge conflicts"
+    decision = pr.get("reviewDecision")
+    if decision == "CHANGES_REQUESTED":
+        return "Changes requested"
+    if decision == "APPROVED":
+        return "Approved"
+    if decision == "REVIEW_REQUIRED":
+        return "Review required"
+    if section == "needs_review":
+        return "Review requested"
+    if section == "waiting":
+        return "Waiting"
+    if section == "ready":
+        return "Ready to merge"
+    return pr_status(pr)
+
+
+def check_summary(pr: dict[str, Any]) -> tuple[str, str]:
+    """Return (display, style) for CI checks, e.g. ('9/9', 'green')."""
+    commits = (pr.get("commits") or {}).get("nodes") or []
+    if not commits:
+        return ("—", "#8b9bb0")
+    rollup = ((commits[0].get("commit") or {}).get("statusCheckRollup")) or {}
+    raw_contexts = rollup.get("contexts") or {}
+    if isinstance(raw_contexts, dict):
+        contexts = raw_contexts.get("nodes") or []
+    else:
+        contexts = raw_contexts or []
+    if not contexts:
+        state = rollup.get("state") or ""
+        labels = {
+            "SUCCESS": ("✓", "#3dd68c"),
+            "FAILURE": ("✗", "#f85149"),
+            "PENDING": ("…", "#d29922"),
+            "EXPECTED": ("…", "#d29922"),
+            "ERROR": ("✗", "#f85149"),
+        }
+        return labels.get(state, ("—", "#8b9bb0"))
+
+    total = len(contexts)
+    passed = 0
+    failed = 0
+    for ctx in contexts:
+        conclusion = ctx.get("conclusion")
+        state = ctx.get("state")
+        if conclusion in {"SUCCESS", "NEUTRAL", "SKIPPED"} or state == "SUCCESS":
+            passed += 1
+        elif conclusion in {"FAILURE", "TIMED_OUT", "CANCELLED", "ACTION_REQUIRED"} or state in {
+            "FAILURE",
+            "ERROR",
+        }:
+            failed += 1
+    text = f"{passed}/{total}"
+    if failed:
+        return (text, "#f85149")
+    if passed == total and total > 0:
+        return (text, "#3dd68c")
+    return (text, "#d29922")
 
 
 def get_pr_detail(pr: dict[str, Any]) -> dict[str, Any]:
@@ -282,6 +459,8 @@ def get_pr_detail(pr: dict[str, Any]) -> dict[str, Any]:
 def pr_status(pr: dict[str, Any]) -> str:
     if pr.get("merged"):
         return "Merged"
+    if pr.get("isDraft") and pr.get("state") == "OPEN":
+        return "Draft"
     if pr.get("state") == "OPEN":
         return "Open"
     return "Closed"
@@ -310,7 +489,6 @@ def pr_review_comments(pr: dict[str, Any]) -> int:
             comments = (thread or {}).get("comments") or {}
             total += int(comments.get("totalCount") or 0)
         return total
-    # Fallback when only thread count is available
     return int(threads.get("totalCount") or 0)
 
 
@@ -330,7 +508,6 @@ def iter_review_comments(pr: dict[str, Any]) -> list[dict[str, Any]]:
             item["_resolved"] = resolved
             out.append(item)
     return out
-
 
 
 def search_prs(prs: list[dict[str, Any]], query: str = "") -> list[dict[str, Any]]:
@@ -378,7 +555,7 @@ def compute_stats(prs: list[dict[str, Any]]) -> dict[str, Any]:
     repos: Counter[str] = Counter()
     for pr in prs:
         st = pr_status(pr)
-        if st == "Open":
+        if st in {"Open", "Draft"}:
             open_n += 1
         elif st == "Merged":
             merged_n += 1
@@ -423,6 +600,11 @@ def group_by_repo(prs: list[dict[str, Any]]) -> list[dict[str, Any]]:
         )
         bucket["total"] += 1
         st = pr_status(pr)
-        bucket[st.lower()] += 1
+        if st in {"Open", "Draft"}:
+            bucket["open"] += 1
+        elif st == "Merged":
+            bucket["merged"] += 1
+        else:
+            bucket["closed"] += 1
         bucket["loc"] += pr_loc(pr)
     return sorted(buckets.values(), key=lambda r: r["total"], reverse=True)

@@ -10,6 +10,8 @@ class ActionBar(Horizontal):
         yield Static(" Actions ", id="action-label")
         yield Button("Open", id="btn-open", variant="success", flat=True, compact=True)
         yield Button("Details", id="btn-details", variant="primary", flat=True, compact=True)
+        yield Button("Inbox", id="btn-inbox", variant="primary", flat=True, compact=True)
+        yield Button("Closed", id="btn-closed", variant="default", flat=True, compact=True)
         yield Button("Stats", id="btn-stats", variant="default", flat=True, compact=True)
         yield Button("Repos", id="btn-repos", variant="default", flat=True, compact=True)
         yield Button("Search", id="btn-search", variant="default", flat=True, compact=True)

@@ -3,5 +3,6 @@ from rplusview.widget.help_screen import HelpScreen
 from rplusview.widget.setup_screen import SetupScreen
 from rplusview.widget.status_bar import StatusBar
 from rplusview.widget.title_bar import TitleBar
+from rplusview.widget.vim_nav import VimDataTable
 
-__all__ = ["ActionBar", "HelpScreen", "SetupScreen", "StatusBar", "TitleBar"]
+__all__ = ["ActionBar", "HelpScreen", "SetupScreen", "StatusBar", "TitleBar", "VimDataTable"]

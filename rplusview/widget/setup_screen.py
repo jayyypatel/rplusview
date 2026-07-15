@@ -8,12 +8,12 @@ from textual.containers import Horizontal, Vertical
 from textual.screen import ModalScreen
 from textual.widgets import Button, Input, Static
 
-from rplusview.config import get_saved_username
+from rplusview.config import get_saved_username, set_saved_token
 from rplusview.github_client import has_token
 
 
 class SetupScreen(ModalScreen[str | None]):
-    """Collect GitHub username (and token if missing) before loading PRs."""
+    """Collect GitHub username and optionally update the API token."""
 
     BINDINGS = [
         ("escape", "cancel", "Cancel"),
@@ -22,16 +22,26 @@ class SetupScreen(ModalScreen[str | None]):
     def __init__(self, *, first_run: bool = True) -> None:
         super().__init__()
         self.first_run = first_run
-        self._need_token = not has_token()
+        self._has_token = has_token()
 
     def compose(self) -> ComposeResult:
-        title = "Welcome to RPlusView" if self.first_run else "Switch GitHub user"
+        title = "Welcome to RPlusView" if self.first_run else "Account settings"
         subtitle = (
             "Enter a GitHub username to load their pull requests."
             if self.first_run
-            else "Change which GitHub user RPlusView tracks."
+            else "Change the tracked user and/or update your API token."
         )
         saved = get_saved_username() or ""
+        token_label = (
+            "Personal access token  [dim](required for API access)[/dim]"
+            if not self._has_token
+            else "Personal access token  [dim](leave blank to keep current)[/dim]"
+        )
+        token_placeholder = (
+            "ghp_… or github_pat_…"
+            if not self._has_token
+            else "Paste new token to replace the current one"
+        )
 
         with Vertical(id="setup-dialog"):
             yield Static(f"[bold]◆  {title}[/bold]", id="setup-title")
@@ -42,23 +52,18 @@ class SetupScreen(ModalScreen[str | None]):
                 placeholder="e.g. octocat",
                 id="setup-username",
             )
-            if self._need_token:
-                yield Static(
-                    "Personal access token  [dim](needed once for API access)[/dim]",
-                    id="setup-token-label",
-                    markup=True,
-                )
-                yield Input(
-                    placeholder="ghp_… or github_pat_…",
-                    password=True,
-                    id="setup-token",
-                )
-                yield Static(
-                    "[dim]Create a token at github.com/settings/tokens "
-                    "with repo / read:user scope.[/dim]",
-                    id="setup-token-hint",
-                    markup=True,
-                )
+            yield Static(token_label, id="setup-token-label", markup=True)
+            yield Input(
+                placeholder=token_placeholder,
+                password=True,
+                id="setup-token",
+            )
+            yield Static(
+                "[dim]Create a token at github.com/settings/tokens "
+                "with repo / read:user scope.[/dim]",
+                id="setup-token-hint",
+                markup=True,
+            )
             yield Static("", id="setup-error")
             with Horizontal(id="setup-actions"):
                 if not self.first_run:
@@ -76,10 +81,7 @@ class SetupScreen(ModalScreen[str | None]):
 
     @on(Input.Submitted, "#setup-username")
     def on_username_submitted(self) -> None:
-        if self._need_token:
-            self.query_one("#setup-token", Input).focus()
-        else:
-            self._submit()
+        self.query_one("#setup-token", Input).focus()
 
     @on(Input.Submitted, "#setup-token")
     def on_token_submitted(self) -> None:
@@ -101,6 +103,7 @@ class SetupScreen(ModalScreen[str | None]):
 
     def _submit(self) -> None:
         username = self.query_one("#setup-username", Input).value.strip()
+        token = self.query_one("#setup-token", Input).value.strip()
         error = self.query_one("#setup-error", Static)
 
         if not username:
@@ -113,15 +116,13 @@ class SetupScreen(ModalScreen[str | None]):
             self.query_one("#setup-username", Input).focus()
             return
 
-        if self._need_token:
-            token = self.query_one("#setup-token", Input).value.strip()
-            if not token:
-                error.update("[bold red]A GitHub token is required to fetch data.[/]")
-                self.query_one("#setup-token", Input).focus()
-                return
-            from rplusview.config import save_config
+        if not self._has_token and not token:
+            error.update("[bold red]A GitHub token is required to fetch data.[/]")
+            self.query_one("#setup-token", Input).focus()
+            return
 
-            save_config({"token": token})
+        if token:
+            set_saved_token(token)
 
         error.update("")
         self.dismiss(username)

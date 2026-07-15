@@ -4,14 +4,14 @@ from __future__ import annotations
 
 import webbrowser
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
 from rich.text import Text
 from textual import on, work
 from textual.app import App, ComposeResult
 from textual.binding import Binding
 from textual.containers import Container, Vertical
-from textual.widgets import Button, DataTable, Input, LoadingIndicator, Static
+from textual.widgets import Button, Input, LoadingIndicator, Static
 
 from rplusview.config import get_saved_username, set_saved_username
 from rplusview.github_client import (
@@ -24,13 +24,21 @@ from rplusview.github_client import (
     search_prs,
     sort_prs,
 )
-from rplusview.screens import PRDetailScreen, ReposScreen, StatsScreen
-from rplusview.widget import ActionBar, HelpScreen, StatusBar, TitleBar
+from rplusview.screens import InboxScreen, PRDetailScreen, ReposScreen, StatsScreen
+from rplusview.widget import ActionBar, HelpScreen, StatusBar, TitleBar, VimDataTable
 from rplusview.widget.setup_screen import SetupScreen
+from rplusview.widget.vim_nav import VIM_NAV_BINDINGS, VimNavMixin
+
+PRFilter = Literal["open", "closed"]
 
 
 def _status_cell(status: str) -> Text:
-    styles = {"Open": "bold #3fb950", "Merged": "bold #a371f7", "Closed": "bold #f85149"}
+    styles = {
+        "Open": "bold #3fb950",
+        "Draft": "bold #8b9bb0",
+        "Merged": "bold #a371f7",
+        "Closed": "bold #f85149",
+    }
     return Text(status, style=styles.get(status, ""))
 
 
@@ -49,7 +57,7 @@ def _comments_cell(count: int) -> Text:
     return Text(str(count), style="bold #f778ba")
 
 
-class RPlusView(App):
+class RPlusView(VimNavMixin, App):
     CSS_PATH = str(Path(__file__).with_name("rplusview.tcss"))
     TITLE = "RPlusView"
     BINDINGS = [
@@ -62,8 +70,11 @@ class RPlusView(App):
         Binding("d", "open_details", "Details", show=False),
         Binding("t", "open_stats", "Stats", show=False),
         Binding("e", "open_repos", "Repos", show=False),
+        Binding("i", "open_inbox", "Inbox", show=False),
+        Binding("c", "toggle_closed", "Closed", show=False),
         Binding("u", "change_user", "User", show=False),
         Binding("escape", "clear_search", "Clear", show=False),
+        *VIM_NAV_BINDINGS,
     ]
 
     def __init__(self) -> None:
@@ -71,6 +82,7 @@ class RPlusView(App):
         self._prs: list[dict[str, Any]] = []
         self._query = ""
         self._sort = "loc"
+        self._pr_filter: PRFilter = "open"
         self._username: str | None = get_saved_username()
 
     def compose(self) -> ComposeResult:
@@ -84,14 +96,14 @@ class RPlusView(App):
             with Vertical(id="loading-pane"):
                 yield LoadingIndicator()
                 yield Static("Fetching pull requests…", id="loading-label")
-            yield DataTable(id="pr-table")
+            yield VimDataTable(id="pr-table")
         yield StatusBar()
 
     def on_mount(self) -> None:
         search = self.query_one("#search-input", Input)
         search.display = False
 
-        table = self.query_one("#pr-table", DataTable)
+        table = self.query_one("#pr-table", VimDataTable)
         table.cursor_type = "row"
         table.zebra_stripes = True
         table.show_header = True
@@ -108,6 +120,7 @@ class RPlusView(App):
             "Created",
         )
         table.display = False
+        self._sync_closed_button()
 
         if self._username:
             self.action_refresh()
@@ -136,8 +149,21 @@ class RPlusView(App):
             self._open_setup(first_run=True)
             return
         self._show_loading(True)
-        self.query_one(StatusBar).set_message(f"Fetching PRs for @{self._username}…")
+        label = "open" if self._pr_filter == "open" else "closed"
+        self.query_one("#loading-label", Static).update(
+            f"Fetching {label} pull requests…"
+        )
+        self.query_one(StatusBar).set_message(
+            f"Fetching {label} PRs for @{self._username}…"
+        )
         self.load_prs()
+
+    def action_toggle_closed(self) -> None:
+        self._pr_filter = "closed" if self._pr_filter == "open" else "open"
+        self._sync_closed_button()
+        mode = "closed / merged" if self._pr_filter == "closed" else "open"
+        self.notify(f"Showing {mode} PRs", timeout=1.5)
+        self.action_refresh()
 
     def action_focus_search(self) -> None:
         search = self.query_one("#search-input", Input)
@@ -151,7 +177,7 @@ class RPlusView(App):
             self._query = ""
             search.display = False
             self._render_table()
-            self.query_one("#pr-table", DataTable).focus()
+            self.query_one("#pr-table", VimDataTable).focus()
 
     def action_cycle_sort(self) -> None:
         idx = SORT_MODES.index(self._sort) if self._sort in SORT_MODES else 0
@@ -183,6 +209,34 @@ class RPlusView(App):
             return
         self.push_screen(ReposScreen(self._prs))
 
+    def action_open_inbox(self) -> None:
+        if not self._username:
+            self.notify("Set a username first", severity="warning")
+            return
+        self.push_screen(InboxScreen(self._username))
+
+    def _vim_nav_blocked(self) -> bool:
+        search = self.query_one("#search-input", Input)
+        return bool(search.display and search.has_focus)
+
+    def _vim_table(self) -> VimDataTable | None:
+        table = self.query_one("#pr-table", VimDataTable)
+        if table.display and table.row_count:
+            return table
+        return None
+
+    def action_vim_search_next(self) -> None:
+        if not self._query:
+            self.notify("Use / to search first", timeout=1.5)
+            return
+        super().action_vim_search_next()
+
+    def action_vim_search_prev(self) -> None:
+        if not self._query:
+            self.notify("Use / to search first", timeout=1.5)
+            return
+        super().action_vim_search_prev()
+
     # ── events ───────────────────────────────────────────────
 
     @on(Button.Pressed)
@@ -190,6 +244,8 @@ class RPlusView(App):
         actions = {
             "btn-open": self.action_open_browser,
             "btn-details": self.action_open_details,
+            "btn-inbox": self.action_open_inbox,
+            "btn-closed": self.action_toggle_closed,
             "btn-stats": self.action_open_stats,
             "btn-repos": self.action_open_repos,
             "btn-search": self.action_focus_search,
@@ -211,8 +267,8 @@ class RPlusView(App):
     def on_search_submitted(self, event: Input.Submitted) -> None:
         self.query_one("#pr-table", DataTable).focus()
 
-    @on(DataTable.RowSelected, "#pr-table")
-    def on_row_selected(self, event: DataTable.RowSelected) -> None:
+    @on(VimDataTable.RowSelected, "#pr-table")
+    def on_row_selected(self, event: VimDataTable.RowSelected) -> None:
         pr = self._pr_by_key(str(event.row_key.value))
         if pr:
             self.push_screen(PRDetailScreen(pr))
@@ -230,11 +286,21 @@ class RPlusView(App):
         self.notify(f"Tracking @{username}", timeout=2)
         self.action_refresh()
 
+    def _sync_closed_button(self) -> None:
+        try:
+            btn = self.query_one("#btn-closed", Button)
+        except Exception:  # noqa: BLE001
+            return
+        if self._pr_filter == "closed":
+            btn.label = "Open PRs"
+        else:
+            btn.label = "Closed"
+
     # ── data ─────────────────────────────────────────────────
 
     def _show_loading(self, visible: bool) -> None:
         self.query_one("#loading-pane").display = visible
-        self.query_one("#pr-table", DataTable).display = not visible
+        self.query_one("#pr-table", VimDataTable).display = not visible
 
     @work(exclusive=True, thread=True)
     def load_prs(self) -> None:
@@ -242,7 +308,7 @@ class RPlusView(App):
             username = self._username or get_username()
             if not username:
                 raise RuntimeError("No username configured")
-            prs = get_prs(username)
+            prs = get_prs(username, state=self._pr_filter)
         except Exception as exc:  # noqa: BLE001
             self.call_from_thread(self._on_load_error, str(exc))
             return
@@ -260,7 +326,7 @@ class RPlusView(App):
         self._show_loading(False)
         self._render_table()
         self.query_one(StatusBar).reset()
-        table = self.query_one("#pr-table", DataTable)
+        table = self.query_one("#pr-table", VimDataTable)
         if table.row_count:
             table.focus()
 
@@ -268,15 +334,17 @@ class RPlusView(App):
         return sort_prs(search_prs(self._prs, self._query), self._sort)
 
     def _render_table(self) -> None:
-        table = self.query_one("#pr-table", DataTable)
+        table = self.query_one("#pr-table", VimDataTable)
         visible = self._visible_prs()
         table.clear()
 
-        open_n = merged_n = closed_n = 0
+        open_n = merged_n = closed_n = draft_n = 0
         for pr in self._prs:
             st = pr_status(pr)
             if st == "Open":
                 open_n += 1
+            elif st == "Draft":
+                draft_n += 1
             elif st == "Merged":
                 merged_n += 1
             else:
@@ -302,15 +370,19 @@ class RPlusView(App):
         bits = [
             user,
             f"{len(visible)}/{len(self._prs)} PRs",
+            f"view:{self._pr_filter}",
             f"sort:{self._sort}",
         ]
         if self._query:
             bits.append(f"search:“{self._query}”")
-        bits.append(f"{open_n} open · {merged_n} merged · {closed_n} closed")
+        if self._pr_filter == "open":
+            bits.append(f"{open_n} open · {draft_n} draft")
+        else:
+            bits.append(f"{merged_n} merged · {closed_n} closed")
         self.query_one(TitleBar).set_meta(" · ".join(bits))
 
     def _selected_pr(self) -> dict[str, Any] | None:
-        table = self.query_one("#pr-table", DataTable)
+        table = self.query_one("#pr-table", VimDataTable)
         if table.row_count == 0:
             return None
         row_key, _ = table.coordinate_to_cell_key(table.cursor_coordinate)

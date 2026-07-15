@@ -5,8 +5,8 @@ class StatusBar(Static):
     """Bottom shortcut strip."""
 
     DEFAULT_TEXT = (
-        " ↑↓ Nav   Enter Details   o Open   / Search   "
-        "s Sort   t Stats   e Repos   u User   r Refresh   ? Help   q Quit "
+        " j/k gg G  ctrl+d/u  ctrl+f/b  Enter Details   o Open   i Inbox   c Closed   "
+        "/ Search   n/N match   u User   r Refresh   ? Help   q Quit "
     )
 
     def __init__(self) -> None:
