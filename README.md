@@ -13,14 +13,14 @@
 
 <p align="center">
   <b>⚡ A colorful terminal dashboard for your GitHub pull requests</b><br/>
-  Search · Sort · Stats · Repos · Open in browser · First-run setup
+  Search · Sort · Inbox · Stats · Repos · Open in browser · First-run setup
 </p>
 
 <p align="center">
+  <img alt="PyPI" src="https://img.shields.io/badge/pypi-v3.0.0-3776AB?style=for-the-badge&logo=pypi&logoColor=white"/>
   <img alt="Python" src="https://img.shields.io/badge/python-3.10%2B-3776AB?style=for-the-badge&logo=python&logoColor=white"/>
   <img alt="Textual" src="https://img.shields.io/badge/TUI-Textual-0ea5e9?style=for-the-badge"/>
   <img alt="License" src="https://img.shields.io/badge/license-MIT-22c55e?style=for-the-badge"/>
-  <img alt="Status" src="https://img.shields.io/badge/status-ready-a855f7?style=for-the-badge"/>
 </p>
 
 ---
