@@ -9,6 +9,8 @@ from typing import Any, Literal
 
 import requests
 
+from rplusview.safe import InvalidUsernameError, validate_github_username
+
 API_URL = "https://api.github.com/graphql"
 
 PR_StateFilter = Literal["open", "closed", "all"]
@@ -217,15 +219,19 @@ def get_username() -> str | None:
         return saved
     _load_dotenv()
     env_user = os.environ.get("GITHUB_USERNAME") or os.environ.get("GH_USER")
-    return (env_user or "").strip() or None
+    raw = (env_user or "").strip()
+    if not raw:
+        return None
+    try:
+        return validate_github_username(raw)
+    except InvalidUsernameError:
+        return None
 
 
 def require_token() -> str:
     token = get_token()
     if not token:
-        raise RuntimeError(
-            "No GitHub token found. Set GITHUB_TOKEN or enter one in setup."
-        )
+        raise RuntimeError("No GitHub token found. Set GITHUB_TOKEN or enter one in setup.")
     return token
 
 
@@ -241,7 +247,20 @@ def _headers(token: str) -> dict[str, str]:
     return {
         "Authorization": f"Bearer {token}",
         "Content-Type": "application/json",
+        "Accept": "application/json",
+        "User-Agent": "rplusview",
     }
+
+
+def _graphql_error_message(errors: Any) -> str:
+    """Collapse GraphQL error payloads into a short RuntimeError message."""
+    if isinstance(errors, list) and errors:
+        first = errors[0]
+        if isinstance(first, dict):
+            msg = str(first.get("message") or "GraphQL error")
+            return f"GitHub API error: {msg[:120]}"
+        return f"GitHub API error: {str(first)[:120]}"
+    return "GitHub API returned an error."
 
 
 def _post_graphql(headers: dict[str, str], payload: dict[str, Any]) -> dict[str, Any]:
@@ -252,10 +271,14 @@ def _post_graphql(headers: dict[str, str], payload: dict[str, Any]) -> dict[str,
             if response.status_code in {502, 503, 504}:
                 last_error = RuntimeError(f"GitHub {response.status_code}")
                 continue
+            if response.status_code == 401:
+                raise RuntimeError("GitHub 401 unauthorized")
+            if response.status_code == 403:
+                raise RuntimeError("GitHub 403 rate limit or permission denied")
             response.raise_for_status()
             data = response.json()
             if "errors" in data:
-                raise RuntimeError(data["errors"])
+                raise RuntimeError(_graphql_error_message(data["errors"]))
             return data
         except requests.RequestException as exc:
             last_error = exc
@@ -263,7 +286,8 @@ def _post_graphql(headers: dict[str, str], payload: dict[str, Any]) -> dict[str,
 
 
 def _search_query(username: str, state: PR_StateFilter) -> str:
-    base = f"author:{username} type:pr"
+    safe_user = validate_github_username(username)
+    base = f"author:{safe_user} type:pr"
     if state == "open":
         return f"{base} is:open"
     if state == "closed":
@@ -307,22 +331,35 @@ def get_prs(
     username = author or get_username()
     if not username:
         raise RuntimeError("No GitHub username configured.")
+    username = validate_github_username(username)
     return _search_prs(_search_query(username, state))
 
 
-def get_inbox(author: str | None = None) -> dict[str, list[dict[str, Any]]]:
-    """Fetch and categorize PRs into a GitHub Pulls-style inbox."""
+def get_inbox(
+    author: str | None = None,
+) -> tuple[dict[str, list[dict[str, Any]]], list[str]]:
+    """Fetch and categorize PRs into a GitHub Pulls-style inbox.
+
+    Returns ``(sections, warnings)``. Warnings are user-facing strings when
+    optional inbox slices (e.g. review requests) fail.
+    """
     username = author or get_username()
     if not username:
         raise RuntimeError("No GitHub username configured.")
+    username = validate_github_username(username)
+    warnings: list[str] = []
 
     authored_open = _search_prs(f"author:{username} type:pr is:open")
     try:
         review_requested = _search_prs(f"review-requested:{username} type:pr is:open")
-    except Exception:  # noqa: BLE001
+    except (RuntimeError, requests.RequestException) as exc:
         review_requested = []
+        warnings.append("Could not load review requests — check token scopes or rate limits.")
+        # Keep a short internal detail for logs/tests without dumping payloads.
+        _ = str(exc)
 
-    return categorize_inbox(authored_open, review_requested, username=username)
+    sections = categorize_inbox(authored_open, review_requested, username=username)
+    return sections, warnings
 
 
 def categorize_inbox(
@@ -332,6 +369,7 @@ def categorize_inbox(
     username: str,
 ) -> dict[str, list[dict[str, Any]]]:
     """Split open PRs into inbox panels (mutually exclusive for authored)."""
+    username = validate_github_username(username)
     drafts: list[dict[str, Any]] = []
     waiting: list[dict[str, Any]] = []
     needs_action: list[dict[str, Any]] = []

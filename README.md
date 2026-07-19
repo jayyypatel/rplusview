@@ -12,59 +12,96 @@
 </p>
 
 <p align="center">
-  <b>⚡ A colorful terminal dashboard for your GitHub pull requests</b><br/>
+  <b>A colorful terminal dashboard for your GitHub pull requests</b><br/>
   Search · Sort · Inbox · Stats · Repos · Open in browser · First-run setup
 </p>
 
 <p align="center">
-  <img alt="PyPI" src="https://img.shields.io/badge/pypi-v3.0.0-3776AB?style=for-the-badge&logo=pypi&logoColor=white"/>
-  <img alt="Python" src="https://img.shields.io/badge/python-3.10%2B-3776AB?style=for-the-badge&logo=python&logoColor=white"/>
-  <img alt="Textual" src="https://img.shields.io/badge/TUI-Textual-0ea5e9?style=for-the-badge"/>
-  <img alt="License" src="https://img.shields.io/badge/license-MIT-22c55e?style=for-the-badge"/>
+  <a href="https://pypi.org/project/rplusview/"><img alt="PyPI version" src="https://img.shields.io/pypi/v/rplusview.svg?style=for-the-badge&logo=pypi&logoColor=white&label=PyPI"></a>
+  <a href="https://pypi.org/project/rplusview/"><img alt="Python versions" src="https://img.shields.io/pypi/pyversions/rplusview.svg?style=for-the-badge&logo=python&logoColor=white"></a>
+  <a href="https://github.com/jayyypatel/rplusview/blob/main/LICENSE"><img alt="License" src="https://img.shields.io/pypi/l/rplusview.svg?style=for-the-badge&color=22c55e"></a>
+  <a href="https://github.com/jayyypatel/rplusview/actions/workflows/ci.yml"><img alt="CI" src="https://img.shields.io/github/actions/workflow/status/jayyypatel/rplusview/ci.yml?branch=main&style=for-the-badge&label=CI"></a>
+</p>
+
+<p align="center">
+  <img alt="Textual" src="https://img.shields.io/badge/TUI-Textual-0ea5e9?style=flat-square"/>
+  <img alt="GitHub GraphQL" src="https://img.shields.io/badge/API-GitHub%20GraphQL-181717?style=flat-square&logo=github"/>
+  <a href="https://github.com/jayyypatel/rplusview/stargazers"><img alt="Stars" src="https://img.shields.io/github/stars/jayyypatel/rplusview?style=flat-square"/></a>
+  <a href="https://github.com/jayyypatel/rplusview/issues"><img alt="Issues" src="https://img.shields.io/github/issues/jayyypatel/rplusview?style=flat-square"/></a>
+</p>
+
+<p align="center">
+  <strong>Open source under the <a href="LICENSE">MIT License</a></strong> — fork it, improve it, ship PRs.<br/>
+  Maintainer-only PyPI releases · community contributions welcome via GitHub.
 </p>
 
 ---
 
-## ✨ Features
+## Demo
 
-| | |
-|---|---|
-| 🎨 | **Polished dark TUI** with GitHub-inspired greens, blues & purples |
-| 👋 | **First-run welcome popup** — enter any GitHub username dynamically |
-| 🔍 | **Live search** across title, repo, PR number & status |
-| 📊 | **Stats & repos views** with LOC, open/merged/closed breakdowns |
-| 🌐 | **Open in browser** for PRs and repositories |
-| ⌨️ | **Toolbar buttons + shortcuts** — vim `j`/`k` nav, everything is one key away |
-| 🔄 | **Switch user / token anytime** with the User button (`u`) |
-| 📥 | **Inbox panels** — drafts, needs action, review requests (like GitHub Pulls) |
-| ⚡ | **Open PRs first** — faster load; toggle Closed when you need history |
+<p align="center">
+  <img alt="RPlusView screenshot" src="photos/screenshot_app.png" width="900"/>
+</p>
 
 ---
 
-## 📦 Install as a package
+## Why RPlusView?
+
+GitHub’s web PR list is fine. Your terminal can be faster.
+
+RPlusView is a **Textual TUI** that loads your pull requests over the GitHub GraphQL API, then lets you search, sort, triage an inbox, inspect details, and jump to the browser — without leaving the keyboard.
+
+| | Capability |
+|---|---|
+| Dashboard | Open PRs first (fast); toggle closed/merged when you need history |
+| Inbox | Drafts, needs action, review requests — Pulls-style panels |
+| Navigation | Vim `j`/`k`, `gg`/`G`, page keys, live `/` search |
+| Insights | Stats and per-repo breakdowns (LOC, open/merged/closed) |
+| Setup | First-run welcome; change user or token anytime (`u`) |
+
+---
+
+## Install
+
+**From PyPI (recommended):**
 
 ```bash
 pip install rplusview
 ```
 
+**From source (latest `main`):**
+
+```bash
+git clone https://github.com/jayyypatel/rplusview.git
+cd rplusview
+pip install .
+```
+
+**Requirements:** Python **3.10+**, a GitHub personal access token.
+
 ---
 
-## 🚀 Quick start
+## Quick start
 
 ```bash
 # 1) Install
-pip install .
+pip install rplusview
 
-# 2) Token (required for GitHub API)
+# 2) Provide a token (pick one)
 export GITHUB_TOKEN=ghp_your_token_here
-# or copy .env.example → .env and fill GITHUB_TOKEN
+# or: copy .env.example → .env and set GITHUB_TOKEN
+# or: paste the token in the first-run / User (u) screen
 
 # 3) Launch
 rplusview
 ```
 
-On **first launch**, a welcome popup asks for the GitHub username to track.  
-That username is saved in `~/.config/rplusview/config.json`.
+On first launch, enter the **GitHub username** whose PRs you want to track.  
+That username (and optionally the token) is saved under:
+
+```text
+~/.config/rplusview/config.json
+```
 
 ```text
 ┌──────────────────────────────────────────────┐
@@ -82,7 +119,28 @@ That username is saved in `~/.config/rplusview/config.json`.
 
 ---
 
-## 🎮 Controls
+## Authentication
+
+| Source | Notes |
+|--------|--------|
+| UI (`u` / setup screen) | Saved to config; **preferred** over env |
+| `GITHUB_TOKEN` or `GH_TOKEN` | Environment variable |
+| `.env` | Local only — never commit (see `.gitignore`) |
+
+Create a token at [github.com/settings/tokens](https://github.com/settings/tokens).
+
+**Suggested scopes**
+
+| Token type | Minimum |
+|------------|---------|
+| Classic PAT | `repo` (private) or `public_repo` (public-only) |
+| Fine-grained | Repository access for the repos you care about + pull requests read |
+
+Treat the token like a password. Prefer fine-grained tokens with the least access you need.
+
+---
+
+## Controls
 
 ### Toolbar
 
@@ -92,20 +150,20 @@ That username is saved in `~/.config/rplusview/config.json`.
 
 | Key | Action |
 |:---:|--------|
-| `j` `k` / `↑` `↓` | Navigate rows (vim-style) |
-| `gg` / `G` | First row / last row |
+| `j` `k` / `↑` `↓` | Navigate rows |
+| `gg` / `G` | First / last row |
 | `ctrl+d` / `ctrl+u` | Half page down / up |
 | `ctrl+f` / `ctrl+b` | Full page down / up |
 | `n` / `N` | Next / previous search match |
 | `Enter` / `d` | PR details |
 | `o` | Open in browser |
-| `i` | Inbox (drafts · needs action · review requests) |
-| `c` | Toggle open ↔ closed/merged PRs |
+| `i` | Inbox |
+| `c` | Toggle open ↔ closed/merged |
 | `/` | Live search |
 | `s` | Cycle sort (LOC → Date → Title → Repo → Files → #) |
 | `t` | Statistics |
 | `e` | Repositories |
-| `u` | Change user and/or API token |
+| `u` | Change user and/or token |
 | `r` | Refresh |
 | `?` | Help |
 | `Esc` | Clear search / go back |
@@ -113,46 +171,91 @@ That username is saved in `~/.config/rplusview/config.json`.
 
 ---
 
-## 🗂️ Project layout
+## Configuration
+
+| What | Where |
+|------|--------|
+| GitHub token | Setup / `u` → `~/.config/rplusview/config.json`, or `GITHUB_TOKEN` / `.env` |
+| Tracked username | Setup / `u` → `~/.config/rplusview/config.json` |
+
+Config directory is `0700` and the file is `0600`. The token is stored **plaintext** in
+that file (readable only by your user) — treat the machine account as trusted, or use
+env/`GITHUB_TOKEN` instead of saving via the UI.
+
+---
+
+## Project layout
 
 ```text
-github_plugin/
-├── pyproject.toml          # package metadata + CLI entrypoint
+rplusview/
+├── pyproject.toml              # package metadata + CLI entrypoint
 ├── README.md
+├── LICENSE                     # MIT
+├── CONTRIBUTING.md
+├── SECURITY.md
+├── CODE_OF_CONDUCT.md
 ├── .env.example
-├── app.py                  # thin launcher
-└── rplusview/              # installable Python package
-    ├── app.py              # main TUI
-    ├── github_client.py    # GraphQL API
-    ├── config.py           # saved username / token
-    ├── rplusview.tcss      # theme
-    ├── screens/            # details · stats · repos
-    └── widget/             # title · actions · setup · help
+├── .github/                    # CI, CodeQL, Gitleaks, release, templates
+├── docs/PUBLISHING.md          # maintainer-only PyPI process
+├── tests/
+└── rplusview/                  # installable package
+    ├── app.py                  # main TUI
+    ├── github_client.py        # GraphQL API
+    ├── config.py               # saved username / token
+    ├── rplusview.tcss
+    ├── screens/
+    └── widget/
 ```
 
 ---
 
-## 🔐 Config
+## Development
 
-| What | Where |
-|------|--------|
-| GitHub token | User button (`u`) · or `~/.config/rplusview/config.json` · or `GITHUB_TOKEN` / `.env` |
-| Tracked username | User button (`u`) → `~/.config/rplusview/config.json` |
+```bash
+git clone https://github.com/jayyypatel/rplusview.git
+cd rplusview
+python -m venv .venv
+source .venv/bin/activate
+pip install -e ".[dev]"
+pytest -q
+ruff check .
+ruff format .
+```
 
-Token saved via the UI is preferred over env/`.env`, so you can fix a wrong token without reinstalling.
+Optional local hooks:
 
-Create a classic PAT at [github.com/settings/tokens](https://github.com/settings/tokens)  
-with at least **`repo`** (or public_repo) access for searching PRs.
+```bash
+pre-commit install
+```
+
+CI runs on every pull request: **ruff**, **pytest** (Python 3.10–3.13), **pip-audit**, **Gitleaks**, and **CodeQL**.
 
 ---
 
+## Contributing (open source)
 
-## 💜 Why RPlusView?
+RPlusView is a public MIT project. Anyone can fork and open a PR.
 
-Because your PRs deserve a dashboard that feels as sharp as your code 
-fast, colorful, and living right inside the terminal.
+1. Read **[CONTRIBUTING.md](CONTRIBUTING.md)** — fork → branch → PR, DCO sign-off (`git commit -s`).
+2. Follow the **[Code of Conduct](CODE_OF_CONDUCT.md)**.
+3. Use the issue / PR templates for clear reports and reviews.
 
-<p align="center">
-  <img alt="made with textual" src="https://img.shields.io/badge/made%20with-Textual-0ea5e9?style=flat-square"/>
-  <img alt="github" src="https://img.shields.io/badge/powered%20by-GitHub%20GraphQL-181717?style=flat-square&logo=github"/>
-</p>
+**PyPI publishing is maintainer-only.** Contributors never need PyPI credentials; only the owner tags releases and approves the protected `pypi` environment. Details: [docs/PUBLISHING.md](docs/PUBLISHING.md).
+
+---
+
+## Security
+
+- Report vulnerabilities **privately** — see **[SECURITY.md](SECURITY.md)**.
+- Do not open public issues for token leaks or exploitable bugs.
+- Never paste PATs into issues, PRs, or screenshots.
+
+---
+
+## License
+
+[MIT](LICENSE) © RPlusView contributors.
+
+```text
+pip install rplusview && rplusview
+```

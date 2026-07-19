@@ -25,7 +25,6 @@ classifiers = [
     "Development Status :: 5 - Production/Stable",
     "Environment :: Console",
     "Intended Audience :: Developers",
-    "License :: OSI Approved :: MIT License",
     "Operating System :: OS Independent",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.10",
@@ -41,15 +40,23 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-dev = ["build", "twine"]
+dev = [
+    "build",
+    "twine",
+    "pytest>=8.0",
+    "ruff>=0.9",
+    "pip-audit>=2.7",
+    "pre-commit>=4.0",
+]
 
 [project.scripts]
 rplusview = "rplusview.app:main"
 
 [project.urls]
-Homepage = "https://github.com/jayp-odoo/github_plugin"
-Repository = "https://github.com/jayp-odoo/github_plugin"
-Issues = "https://github.com/jayp-odoo/github_plugin/issues"
+Homepage = "https://github.com/jayyypatel/rplusview"
+Repository = "https://github.com/jayyypatel/rplusview"
+Issues = "https://github.com/jayyypatel/rplusview/issues"
+Changelog = "https://github.com/jayyypatel/rplusview/releases"
 
 [tool.setuptools.packages.find]
 where = ["."]
@@ -57,3 +64,22 @@ include = ["rplusview*"]
 
 [tool.setuptools.package-data]
 rplusview = ["*.tcss"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+
+[tool.ruff]
+target-version = "py310"
+line-length = 100
+src = ["rplusview", "tests"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP", "S"]
+ignore = [
+    "S101",  # assert OK in tests
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["S"]
+"scripts/**" = ["S"]

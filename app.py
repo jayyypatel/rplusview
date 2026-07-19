@@ -1,4 +1,4 @@
-"""Backward-compatible launcher. Prefer: pip install . && rplusview """
+"""Backward-compatible launcher. Prefer: pip install . && rplusview"""
 
 from rplusview.app import main
 
