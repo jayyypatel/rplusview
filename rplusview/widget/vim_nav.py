@@ -7,7 +7,6 @@ from typing import ClassVar
 from textual.binding import Binding, BindingType
 from textual.widgets import DataTable
 
-
 # App/screen-level bindings (delegate to the active table when possible).
 VIM_NAV_BINDINGS: list[BindingType] = [
     Binding("j", "vim_cursor_down", "Down", show=False, priority=True),

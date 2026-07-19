@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import webbrowser
 from pathlib import Path
 from typing import Any, Literal
 
@@ -24,6 +23,7 @@ from rplusview.github_client import (
     search_prs,
     sort_prs,
 )
+from rplusview.safe import open_github_url, user_facing_error, validate_github_username
 from rplusview.screens import InboxScreen, PRDetailScreen, ReposScreen, StatsScreen
 from rplusview.widget import ActionBar, HelpScreen, StatusBar, TitleBar, VimDataTable
 from rplusview.widget.setup_screen import SetupScreen
@@ -150,12 +150,8 @@ class RPlusView(VimNavMixin, App):
             return
         self._show_loading(True)
         label = "open" if self._pr_filter == "open" else "closed"
-        self.query_one("#loading-label", Static).update(
-            f"Fetching {label} pull requests…"
-        )
-        self.query_one(StatusBar).set_message(
-            f"Fetching {label} PRs for @{self._username}…"
-        )
+        self.query_one("#loading-label", Static).update(f"Fetching {label} pull requests…")
+        self.query_one(StatusBar).set_message(f"Fetching {label} PRs for @{self._username}…")
         self.load_prs()
 
     def action_toggle_closed(self) -> None:
@@ -189,8 +185,10 @@ class RPlusView(VimNavMixin, App):
         pr = self._selected_pr()
         if not pr:
             return
-        webbrowser.open(pr["url"])
-        self.notify(f"Opened #{pr['number']} in browser", timeout=2)
+        if not open_github_url(pr.get("url") or ""):
+            self.notify("Blocked non-GitHub URL", severity="warning", timeout=3)
+            return
+        self.notify(f"Opened #{pr.get('number')} in browser", timeout=2)
 
     def action_open_details(self) -> None:
         pr = self._selected_pr()
@@ -265,7 +263,7 @@ class RPlusView(VimNavMixin, App):
 
     @on(Input.Submitted, "#search-input")
     def on_search_submitted(self, event: Input.Submitted) -> None:
-        self.query_one("#pr-table", DataTable).focus()
+        self.query_one("#pr-table", VimDataTable).focus()
 
     @on(VimDataTable.RowSelected, "#pr-table")
     def on_row_selected(self, event: VimDataTable.RowSelected) -> None:
@@ -281,7 +279,12 @@ class RPlusView(VimNavMixin, App):
     def _on_setup_done(self, username: str | None) -> None:
         if not username:
             return
-        set_saved_username(username)
+        try:
+            username = validate_github_username(username)
+            set_saved_username(username)
+        except ValueError as exc:
+            self.notify(user_facing_error(exc), severity="error", timeout=5)
+            return
         self._username = username
         self.notify(f"Tracking @{username}", timeout=2)
         self.action_refresh()
@@ -307,10 +310,11 @@ class RPlusView(VimNavMixin, App):
         try:
             username = self._username or get_username()
             if not username:
-                raise RuntimeError("No username configured")
+                raise RuntimeError("No GitHub username configured.")
+            username = validate_github_username(username)
             prs = get_prs(username, state=self._pr_filter)
         except Exception as exc:  # noqa: BLE001
-            self.call_from_thread(self._on_load_error, str(exc))
+            self.call_from_thread(self._on_load_error, user_facing_error(exc))
             return
         self.call_from_thread(self._on_load_success, prs, username)
 
@@ -352,18 +356,23 @@ class RPlusView(VimNavMixin, App):
 
         for pr in visible:
             status = pr_status(pr)
+            repo = (pr.get("repository") or {}).get("nameWithOwner") or "?"
+            title = pr.get("title") or "(no title)"
+            number = pr.get("number") or 0
+            created = str(pr.get("createdAt") or "")[:10]
+            url = pr.get("url") or f"{repo}#{number}"
             table.add_row(
-                Text(f"#{pr['number']}", style="bold"),
-                pr["repository"]["nameWithOwner"],
-                pr["title"],
-                _diff_cell(pr["additions"], "+"),
-                _diff_cell(pr["deletions"], "-"),
+                Text(f"#{number}", style="bold"),
+                repo,
+                title,
+                _diff_cell(int(pr.get("additions") or 0), "+"),
+                _diff_cell(int(pr.get("deletions") or 0), "-"),
                 str(pr_loc(pr)),
-                str(pr["changedFiles"]),
+                str(pr.get("changedFiles") or 0),
                 _comments_cell(pr_comments(pr)),
                 _status_cell(status),
-                pr["createdAt"][:10],
-                key=pr["url"],
+                created,
+                key=url,
             )
 
         user = f"@{self._username}" if self._username else "—"

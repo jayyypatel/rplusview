@@ -10,6 +10,7 @@ from textual.widgets import Button, Input, Static
 
 from rplusview.config import get_saved_username, set_saved_token
 from rplusview.github_client import has_token
+from rplusview.safe import InvalidUsernameError, validate_github_username
 
 
 class SetupScreen(ModalScreen[str | None]):
@@ -59,8 +60,8 @@ class SetupScreen(ModalScreen[str | None]):
                 id="setup-token",
             )
             yield Static(
-                "[dim]Create a token at github.com/settings/tokens "
-                "with repo / read:user scope.[/dim]",
+                "[dim]Prefer a fine-grained token with Pull requests: Read. "
+                "Classic: public_repo or repo. github.com/settings/tokens[/dim]",
                 id="setup-token-hint",
                 markup=True,
             )
@@ -102,17 +103,14 @@ class SetupScreen(ModalScreen[str | None]):
         self.dismiss(None)
 
     def _submit(self) -> None:
-        username = self.query_one("#setup-username", Input).value.strip()
+        raw_username = self.query_one("#setup-username", Input).value.strip()
         token = self.query_one("#setup-token", Input).value.strip()
         error = self.query_one("#setup-error", Static)
 
-        if not username:
-            error.update("[bold red]Please enter a GitHub username.[/]")
-            self.query_one("#setup-username", Input).focus()
-            return
-
-        if " " in username or "/" in username:
-            error.update("[bold red]Username should be a single GitHub login.[/]")
+        try:
+            username = validate_github_username(raw_username)
+        except InvalidUsernameError as exc:
+            error.update(f"[bold red]{exc}[/]")
             self.query_one("#setup-username", Input).focus()
             return
 

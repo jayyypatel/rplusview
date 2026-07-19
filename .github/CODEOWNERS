@@ -1,0 +1,9 @@
+# Default owners for everything in the repo.
+*       @jayyypatel
+
+# Auth / API surface — keep maintainer eyes on these paths.
+/rplusview/github_client.py  @jayyypatel
+/rplusview/config.py         @jayyypatel
+
+# CI and repo governance
+/.github/  @jayyypatel

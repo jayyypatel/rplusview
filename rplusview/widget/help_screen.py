@@ -11,7 +11,6 @@ from rplusview.widget.vim_nav import (
     vim_scroll_top,
 )
 
-
 HELP_BODY = """\
 [bold]Toolbar buttons[/bold]
   [bold green]Open[/]        Open selected PR in browser
