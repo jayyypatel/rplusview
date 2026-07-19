@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import re
-import webbrowser
 from typing import Any
 
 from rich.text import Text
@@ -19,17 +18,13 @@ from rplusview.github_client import (
     get_pr_detail,
     group_by_repo,
     iter_review_comments,
-    pr_comments,
     pr_issue_comments,
     pr_loc,
     pr_review_comments,
     pr_status,
 )
-<<<<<<< Updated upstream
-=======
 from rplusview.odoo_task import open_odoo_task, pr_task_id, pr_task_label
 from rplusview.safe import escape_markup, open_github_url
->>>>>>> Stashed changes
 from rplusview.screens.inbox import InboxScreen
 from rplusview.widget.help_screen import HelpScreen
 from rplusview.widget.status_bar import StatusBar
@@ -46,18 +41,6 @@ from rplusview.widget.vim_nav import (
 
 __all__ = ["InboxScreen", "PRDetailScreen", "ReposScreen", "StatsScreen"]
 
-<<<<<<< Updated upstream
-def _open_url(url: str) -> None:
-    if url:
-        webbrowser.open(url)
-
-
-def _escape_markup(text: str) -> str:
-    """Escape Rich markup brackets in user content."""
-    return text.replace("[", "\\[")
-
-=======
->>>>>>> Stashed changes
 
 def _trim_body(text: str, limit: int = 600) -> str:
     text = (text or "").strip()
@@ -91,15 +74,7 @@ def _format_comments(pr: dict[str, Any]) -> str:
 
     blocks: list[str] = []
     for i, node in enumerate(comments, start=1):
-<<<<<<< Updated upstream
-        author = (node.get("author") or {}).get("login") or "unknown"
-        created = str(node.get("createdAt") or "")[:10]
-        body = _escape_markup(_trim_body(node.get("body") or ""))
-        if not body:
-            body = "[dim]_empty comment_[/]"
-=======
         author, created = _author_date(node)
->>>>>>> Stashed changes
         blocks.append(
             f"[bold #58a6ff]#{i}[/]  [bold #3dd68c]@{author}[/]  "
             f"[dim]{created}[/]\n"
@@ -127,16 +102,9 @@ def _format_inline_comments(pr: dict[str, Any]) -> str:
 
     shown = nodes[:40]
     blocks: list[str] = []
-<<<<<<< Updated upstream
-    for i, node in enumerate(nodes[:40], start=1):
-        author = (node.get("author") or {}).get("login") or "unknown"
-        created = str(node.get("createdAt") or "")[:10]
-        path = node.get("path") or ""
-=======
     for i, node in enumerate(shown, start=1):
         author, created = _author_date(node)
         path = escape_markup(node.get("path") or "")
->>>>>>> Stashed changes
         line = node.get("line")
         loc = f"{path}:{line}" if path and line else path or "diff"
         resolved = " [dim]resolved[/]" if node.get("_resolved") else ""
@@ -171,18 +139,10 @@ def _format_reviews(pr: dict[str, Any]) -> str:
     }
     blocks: list[str] = []
     for node in useful[:15]:
-<<<<<<< Updated upstream
-        author = (node.get("author") or {}).get("login") or "unknown"
-        state = node.get("state") or "COMMENTED"
-        color = state_colors.get(state, "#8b9bb0")
-        created = str(node.get("createdAt") or "")[:10]
-        body = _escape_markup(_trim_body(node.get("body") or "", 400))
-=======
         author, created = _author_date(node)
         raw_state = node.get("state") or "COMMENTED"
         color = state_colors.get(raw_state, "#8b9bb0")
         state = escape_markup(raw_state)
->>>>>>> Stashed changes
         blocks.append(
             f"[bold {color}]● {state}[/]  [bold #a371f7]@{author}[/]  "
             f"[dim]{created}[/]\n"
@@ -292,12 +252,6 @@ class PRDetailScreen(Screen):
     def _show_detail(self, pr: dict[str, Any]) -> None:
         self.pr = pr
         status = pr_status(pr)
-<<<<<<< Updated upstream
-        labels = ", ".join(
-            n["name"] for n in (pr.get("labels") or {}).get("nodes") or []
-        ) or "—"
-        author = (pr.get("author") or {}).get("login") or "—"
-=======
         labels = (
             ", ".join(
                 escape_markup(n.get("name") or "")
@@ -306,20 +260,15 @@ class PRDetailScreen(Screen):
             or "—"
         )
         author = escape_markup((pr.get("author") or {}).get("login") or "—")
->>>>>>> Stashed changes
         body = (pr.get("body") or "").strip() or "_No description provided._"
         if len(body) > 4000:
             body = body[:4000] + "\n\n…"
         body = escape_markup(body)
 
-<<<<<<< Updated upstream
-        repo = pr.get("repository", {}).get("nameWithOwner") or "—"
-=======
         repo = escape_markup(pr.get("repository", {}).get("nameWithOwner") or "—")
         head = escape_markup(pr.get("headRefName") or "—")
         base = escape_markup(pr.get("baseRefName") or "—")
         url = escape_markup(pr.get("url") or "")
->>>>>>> Stashed changes
         commits = (pr.get("commits") or {}).get("totalCount", "—")
         issue_n = pr_issue_comments(pr)
         review_n = pr_review_comments(pr)
@@ -340,13 +289,9 @@ class PRDetailScreen(Screen):
         task_label = escape_markup(pr_task_label(pr) or "—")
         self.query_one("#detail-meta", Static).update(
             f"[bold #3dd68c]Author[/]    [bold]@{author}[/]\n"
-<<<<<<< Updated upstream
-            f"[bold #3dd68c]Branch[/]    {pr.get('headRefName', '—')} → {pr.get('baseRefName', '—')}\n"
-=======
             f"[bold #3dd68c]Branch[/]    {head} → {base}\n"
             f"[bold #3dd68c]Task[/]      [bold #d29922]{task_label}[/]  "
             f"[dim](press p to open on Odoo)[/]\n"
->>>>>>> Stashed changes
             f"[bold #3dd68c]Diff[/]      [green]+{pr.get('additions', 0)}[/]  "
             f"[red]-{pr.get('deletions', 0)}[/]  ·  "
             f"{pr.get('changedFiles', 0)} files  ·  LOC {pr_loc(pr)}\n"
@@ -357,7 +302,7 @@ class PRDetailScreen(Screen):
             f"[bold #3dd68c]Labels[/]    {labels}\n"
             f"[bold #3dd68c]Created[/]   {str(pr.get('createdAt') or '')[:10]}   "
             f"[bold #3dd68c]Updated[/] {str(pr.get('updatedAt') or '')[:10]}\n"
-            f"[bold #3dd68c]URL[/]       [#58a6ff]{pr.get('url', '')}[/]"
+            f"[bold #3dd68c]URL[/]       [#58a6ff]{url}[/]"
         )
         self.query_one("#detail-body", Static).update(body)
 
@@ -386,13 +331,9 @@ class PRDetailScreen(Screen):
         self.app.pop_screen()
 
     def action_open_browser(self) -> None:
-<<<<<<< Updated upstream
-        _open_url(self.pr.get("url") or "")
-=======
         if not open_github_url(self.pr.get("url") or ""):
             self.notify("Blocked non-GitHub URL", severity="warning", timeout=3)
             return
->>>>>>> Stashed changes
         self.notify("Opened in browser", timeout=2)
 
     def action_open_odoo_task(self) -> None:
@@ -471,9 +412,7 @@ class StatsScreen(VimNavMixin, Screen):
                 key=pr["url"],
             )
 
-        self.query_one(StatusBar).set_message(
-            " j/k gg G  ctrl+d/u  Esc/q Back   ? Help "
-        )
+        self.query_one(StatusBar).set_message(" j/k gg G  ctrl+d/u  Esc/q Back   ? Help ")
         self.query_one(TitleBar).set_meta(
             f"{stats['total']} PRs · {stats['open']} open · {len(stats['repos'])} repos"
         )
@@ -548,13 +487,9 @@ class ReposScreen(VimNavMixin, Screen):
 
     @on(VimDataTable.RowSelected, "#repos-table")
     def on_data_table_row_selected(self, event: VimDataTable.RowSelected) -> None:
-<<<<<<< Updated upstream
-        _open_url(str(event.row_key.value))
-=======
         if not open_github_url(str(event.row_key.value)):
             self.notify("Blocked non-GitHub URL", severity="warning", timeout=3)
             return
->>>>>>> Stashed changes
         self.notify("Opened repository in browser", timeout=2)
 
     def action_go_back(self) -> None:
@@ -565,13 +500,9 @@ class ReposScreen(VimNavMixin, Screen):
         if table.row_count == 0:
             return
         row_key, _ = table.coordinate_to_cell_key(table.cursor_coordinate)
-<<<<<<< Updated upstream
-        _open_url(str(row_key.value))
-=======
         if not open_github_url(str(row_key.value)):
             self.notify("Blocked non-GitHub URL", severity="warning", timeout=3)
             return
->>>>>>> Stashed changes
         self.notify("Opened repository in browser", timeout=2)
 
     def action_help(self) -> None:

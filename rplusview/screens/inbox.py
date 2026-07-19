@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import webbrowser
 from typing import Any
 
 from rich.text import Text
@@ -20,6 +19,7 @@ from rplusview.github_client import (
     inbox_action_label,
     pr_comments,
 )
+from rplusview.safe import open_github_url, user_facing_error
 from rplusview.widget.help_screen import HelpScreen
 from rplusview.widget.status_bar import StatusBar
 from rplusview.widget.title_bar import TitleBar
@@ -98,11 +98,11 @@ class InboxScreen(VimNavMixin, Screen):
     @work(exclusive=True, thread=True)
     def load_inbox(self) -> None:
         try:
-            data = get_inbox(self.username)
+            data, warnings = get_inbox(self.username)
         except Exception as exc:  # noqa: BLE001
-            self.app.call_from_thread(self._on_error, str(exc))
+            self.app.call_from_thread(self._on_error, user_facing_error(exc))
             return
-        self.app.call_from_thread(self._on_loaded, data)
+        self.app.call_from_thread(self._on_loaded, data, warnings)
 
     def _on_error(self, message: str) -> None:
         self.query_one("#inbox-loading").display = False
@@ -112,7 +112,11 @@ class InboxScreen(VimNavMixin, Screen):
         )
         self.notify(message, severity="error", timeout=6)
 
-    def _on_loaded(self, data: dict[str, list[dict[str, Any]]]) -> None:
+    def _on_loaded(
+        self,
+        data: dict[str, list[dict[str, Any]]],
+        warnings: list[str] | None = None,
+    ) -> None:
         self._inbox = data
         self._pr_by_url = {}
         total = 0
@@ -123,13 +127,17 @@ class InboxScreen(VimNavMixin, Screen):
                 self._expanded[key] = True
             self._fill_section(key, items)
 
+        warn_bits = ""
+        if warnings:
+            warn_bits = " · [bold #d29922]partial[/]"
+            for msg in warnings:
+                self.notify(msg, severity="warning", timeout=5)
+
         self.query_one("#inbox-header", Static).update(
             f"[bold]Inbox[/]  [dim]@{self.username} · {total} items · "
-            f"Updated: open PRs[/]"
+            f"Updated: open PRs[/]{warn_bits}"
         )
-        self.query_one(TitleBar).set_meta(
-            f"@{self.username} · inbox · {total} items"
-        )
+        self.query_one(TitleBar).set_meta(f"@{self.username} · inbox · {total} items")
         self.query_one("#inbox-loading").display = False
         self.query_one("#inbox-scroll").display = True
         self.query_one(StatusBar).set_message(
@@ -193,9 +201,12 @@ class InboxScreen(VimNavMixin, Screen):
     @on(VimDataTable.RowSelected)
     def on_row_selected(self, event: VimDataTable.RowSelected) -> None:
         url = str(event.row_key.value)
-        if url:
-            webbrowser.open(url)
-            self.notify("Opened in browser", timeout=2)
+        if not url:
+            return
+        if not open_github_url(url):
+            self.notify("Blocked non-GitHub URL", severity="warning", timeout=3)
+            return
+        self.notify("Opened in browser", timeout=2)
 
     def _vim_table(self) -> VimDataTable | None:
         return self._active_table()
@@ -216,9 +227,12 @@ class InboxScreen(VimNavMixin, Screen):
             return
         row_key, _ = table.coordinate_to_cell_key(table.cursor_coordinate)
         url = str(row_key.value)
-        if url:
-            webbrowser.open(url)
-            self.notify("Opened in browser", timeout=2)
+        if not url:
+            return
+        if not open_github_url(url):
+            self.notify("Blocked non-GitHub URL", severity="warning", timeout=3)
+            return
+        self.notify("Opened in browser", timeout=2)
 
     def action_go_back(self) -> None:
         self.app.pop_screen()
