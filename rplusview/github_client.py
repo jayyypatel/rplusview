@@ -25,6 +25,7 @@ query($query: String!, $cursor: String) {
         number
         title
         url
+        body
         additions
         deletions
         changedFiles
@@ -35,6 +36,7 @@ query($query: String!, $cursor: String) {
         reviewDecision
         createdAt
         updatedAt
+        headRefName
         author {
           login
         }
@@ -93,12 +95,8 @@ query($owner: String!, $name: String!, $number: Int!) {
       state
       merged
       isDraft
-      mergeable
-      reviewDecision
       createdAt
       updatedAt
-      mergedAt
-      closedAt
       baseRefName
       headRefName
       author {
@@ -120,7 +118,6 @@ query($owner: String!, $name: String!, $number: Int!) {
           }
           body
           createdAt
-          url
         }
       }
       reviewThreads(first: 100) {
@@ -135,7 +132,6 @@ query($owner: String!, $name: String!, $number: Int!) {
               }
               body
               createdAt
-              url
               path
               line
             }
@@ -229,14 +225,6 @@ def require_token() -> str:
     return token
 
 
-def get_credentials() -> tuple[str, str]:
-    username = get_username()
-    token = require_token()
-    if not username:
-        raise RuntimeError("No GitHub username configured. Complete setup first.")
-    return username, token
-
-
 def _headers(token: str) -> dict[str, str]:
     return {
         "Authorization": f"Bearer {token}",
@@ -319,8 +307,14 @@ def get_inbox(author: str | None = None) -> dict[str, list[dict[str, Any]]]:
     authored_open = _search_prs(f"author:{username} type:pr is:open")
     try:
         review_requested = _search_prs(f"review-requested:{username} type:pr is:open")
+<<<<<<< Updated upstream
     except Exception:  # noqa: BLE001
         review_requested = []
+=======
+    except (RuntimeError, requests.RequestException):
+        review_requested = []
+        warnings.append("Could not load review requests — check token scopes or rate limits.")
+>>>>>>> Stashed changes
 
     return categorize_inbox(authored_open, review_requested, username=username)
 
@@ -511,6 +505,8 @@ def iter_review_comments(pr: dict[str, Any]) -> list[dict[str, Any]]:
 
 
 def search_prs(prs: list[dict[str, Any]], query: str = "") -> list[dict[str, Any]]:
+    from rplusview.odoo_task import pr_task_label
+
     needle = query.strip().lower()
     if not needle:
         return list(prs)
@@ -521,6 +517,8 @@ def search_prs(prs: list[dict[str, Any]], query: str = "") -> list[dict[str, Any
             [
                 str(pr.get("number", "")),
                 pr.get("title") or "",
+                pr.get("headRefName") or "",
+                pr_task_label(pr),
                 pr.get("repository", {}).get("nameWithOwner") or "",
                 st,
                 (pr.get("author") or {}).get("login") or "",
@@ -531,10 +529,12 @@ def search_prs(prs: list[dict[str, Any]], query: str = "") -> list[dict[str, Any
     return out
 
 
-SORT_MODES = ("loc", "date", "title", "repo", "files", "number")
+SORT_MODES = ("loc", "date", "title", "repo", "files", "number", "task")
 
 
 def sort_prs(prs: list[dict[str, Any]], mode: str, *, reverse: bool = True) -> list[dict[str, Any]]:
+    from rplusview.odoo_task import pr_task_id
+
     key_map = {
         "loc": pr_loc,
         "date": lambda p: p.get("createdAt") or "",
@@ -542,6 +542,7 @@ def sort_prs(prs: list[dict[str, Any]], mode: str, *, reverse: bool = True) -> l
         "repo": lambda p: (p.get("repository", {}).get("nameWithOwner") or "").lower(),
         "files": lambda p: int(p.get("changedFiles") or 0),
         "number": lambda p: int(p.get("number") or 0),
+        "task": lambda p: int(pr_task_id(p) or 0),
     }
     key = key_map.get(mode, pr_loc)
     if mode in {"title", "repo"}:

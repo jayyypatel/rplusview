@@ -15,6 +15,7 @@ from rplusview.widget.vim_nav import (
 HELP_BODY = """\
 [bold]Toolbar buttons[/bold]
   [bold green]Open[/]        Open selected PR in browser
+  [bold green]Task[/]        Open Odoo task (task-XXXX) in browser
   [bold green]Details[/]     PR details page
   [bold green]Inbox[/]       Pulls inbox (drafts, needs action, …)
   [bold green]Closed[/]      Toggle open ↔ closed/merged PRs
@@ -40,8 +41,9 @@ HELP_BODY = """\
   [bold green]/[/]           Live search (title, repo, #, status)
   [bold green]n / N[/]       Next / previous search match
   [bold green]Enter / d[/]   Open PR details
-  [bold green]o[/]           Open in browser
-  [bold green]s[/]           Sort · LOC → Date → Title → Repo → Files → #
+  [bold green]o[/]           Open PR in browser
+  [bold green]p[/]           Open Odoo task (task-XXXX → odoo.com)
+  [bold green]s[/]           Sort · LOC → Date → Title → Repo → Files → # → Task
   [bold green]i[/]           Inbox panels
   [bold green]c[/]           Toggle closed PRs
   [bold green]t[/]           Statistics

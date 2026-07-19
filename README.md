@@ -29,6 +29,7 @@
 
 | | |
 |---|---|
+<<<<<<< Updated upstream
 | 🎨 | **Polished dark TUI** with GitHub-inspired greens, blues & purples |
 | 👋 | **First-run welcome popup** — enter any GitHub username dynamically |
 | 🔍 | **Live search** across title, repo, PR number & status |
@@ -42,11 +43,33 @@
 ---
 
 ## 📦 Install as a package
+=======
+| Dashboard | Open PRs first (fast); toggle closed/merged when you need history |
+| Inbox | Drafts, needs action, review requests — Pulls-style panels |
+| Navigation | Vim `j`/`k`, `gg`/`G`, page keys, live `/` search |
+| Insights | Stats and per-repo breakdowns (LOC, open/merged/closed) |
+| Odoo tasks | Detects `task-XXXX` in title/branch/body; open on odoo.com with `p` |
+| Setup | First-run welcome; change user or token anytime (`u`) |
+
+---
+
+## Install & quick start
+
+**Requirements:** Python **3.10+** and a GitHub personal access token.
+>>>>>>> Stashed changes
 
 ```bash
 pip install rplusview
+
+# Token (pick one)
+export GITHUB_TOKEN=ghp_your_token_here
+# or: copy .env.example → .env
+# or: paste the token in the first-run / User (u) screen
+
+rplusview
 ```
 
+<<<<<<< Updated upstream
 ---
 
 ## 🚀 Quick start
@@ -60,6 +83,14 @@ export GITHUB_TOKEN=ghp_your_token_here
 # or copy .env.example → .env and fill GITHUB_TOKEN
 
 # 3) Launch
+=======
+From source instead of PyPI:
+
+```bash
+git clone https://github.com/jayyypatel/rplusview.git
+cd rplusview
+pip install .
+>>>>>>> Stashed changes
 rplusview
 ```
 
@@ -86,7 +117,7 @@ That username is saved in `~/.config/rplusview/config.json`.
 
 ### Toolbar
 
-`Open` · `Details` · `Inbox` · `Closed` · `Stats` · `Repos` · `Search` · `Sort` · `Refresh` · `User` · `Help`
+`Open` · `Task` · `Details` · `Inbox` · `Closed` · `Stats` · `Repos` · `Search` · `Sort` · `Refresh` · `User` · `Help`
 
 ### Keyboard
 
@@ -98,9 +129,16 @@ That username is saved in `~/.config/rplusview/config.json`.
 | `ctrl+f` / `ctrl+b` | Full page down / up |
 | `n` / `N` | Next / previous search match |
 | `Enter` / `d` | PR details |
+<<<<<<< Updated upstream
 | `o` | Open in browser |
 | `i` | Inbox (drafts · needs action · review requests) |
 | `c` | Toggle open ↔ closed/merged PRs |
+=======
+| `o` | Open PR in browser |
+| `p` | Open Odoo task (`task-XXXX` → odoo.com) |
+| `i` | Inbox |
+| `c` | Toggle open ↔ closed/merged |
+>>>>>>> Stashed changes
 | `/` | Live search |
 | `s` | Cycle sort (LOC → Date → Title → Repo → Files → #) |
 | `t` | Statistics |
@@ -116,6 +154,7 @@ That username is saved in `~/.config/rplusview/config.json`.
 ## 🗂️ Project layout
 
 ```text
+<<<<<<< Updated upstream
 github_plugin/
 ├── pyproject.toml          # package metadata + CLI entrypoint
 ├── README.md
@@ -128,6 +167,41 @@ github_plugin/
     ├── rplusview.tcss      # theme
     ├── screens/            # details · stats · repos
     └── widget/             # title · actions · setup · help
+=======
+rplusview/
+├── pyproject.toml
+├── README.md · LICENSE · CONTRIBUTING.md · SECURITY.md
+├── .github/                    # CI, CodeQL, Gitleaks, release
+├── docs/PUBLISHING.md
+├── tests/
+└── rplusview/
+    ├── app.py                  # main TUI
+    ├── github_client.py        # GraphQL API
+    ├── config.py · safe.py · odoo_task.py
+    ├── rplusview.tcss
+    ├── screens/ · widget/
+```
+
+---
+
+## Development
+
+```bash
+git clone https://github.com/jayyypatel/rplusview.git
+cd rplusview
+python -m venv .venv
+source .venv/bin/activate
+pip install -e ".[dev]"
+pytest -q
+ruff check .
+ruff format .
+```
+
+Optional local hooks:
+
+```bash
+pre-commit install
+>>>>>>> Stashed changes
 ```
 
 ---
@@ -152,7 +226,11 @@ with at least **`repo`** (or public_repo) access for searching PRs.
 Because your PRs deserve a dashboard that feels as sharp as your code 
 fast, colorful, and living right inside the terminal.
 
+<<<<<<< Updated upstream
 <p align="center">
   <img alt="made with textual" src="https://img.shields.io/badge/made%20with-Textual-0ea5e9?style=flat-square"/>
   <img alt="github" src="https://img.shields.io/badge/powered%20by-GitHub%20GraphQL-181717?style=flat-square&logo=github"/>
 </p>
+=======
+[MIT](LICENSE) © RPlusView contributors.
+>>>>>>> Stashed changes

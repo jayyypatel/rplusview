@@ -26,12 +26,6 @@ from rplusview.widget.title_bar import TitleBar
 from rplusview.widget.vim_nav import VIM_NAV_BINDINGS, VimDataTable, VimNavMixin
 
 
-def _relative_updated(iso: str) -> str:
-    if not iso:
-        return ""
-    return f"Updated {iso[:10]}"
-
-
 class InboxScreen(VimNavMixin, Screen):
     """Inbox panels: drafts, needs action, review requests, etc."""
 
@@ -171,7 +165,7 @@ class InboxScreen(VimNavMixin, Screen):
                 Text(action, style=_action_style(action)),
                 Text(checks, style=check_style),
                 str(pr_comments(pr)),
-                _relative_updated(pr.get("updatedAt") or ""),
+                (f"Updated {pr['updatedAt'][:10]}" if pr.get("updatedAt") else ""),
                 key=url,
             )
 

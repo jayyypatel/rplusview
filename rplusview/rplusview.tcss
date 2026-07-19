@@ -11,8 +11,6 @@ $gh-text: #e8eef7;
 $gh-cursor: #2f81f7;
 $gh-row-odd: #10161e;
 $gh-warn: #d29922;
-$gh-open: #3dd68c;
-$gh-merged: #a371f7;
 $gh-closed: #f85149;
 
 Screen {
