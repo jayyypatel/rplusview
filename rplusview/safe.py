@@ -4,13 +4,13 @@ from __future__ import annotations
 
 import re
 import webbrowser
-from typing import Any
+from collections.abc import Collection
 from urllib.parse import urlparse
 
 # GitHub login rules: 1–39 chars, alphanumeric or single hyphens, no leading/trailing hyphen.
 _GITHUB_USERNAME_RE = re.compile(r"^[A-Za-z0-9](?:[A-Za-z0-9]|-(?=[A-Za-z0-9])){0,38}$")
 
-_ALLOWED_URL_HOSTS = frozenset(
+_ALLOWED_GITHUB_HOSTS = frozenset(
     {
         "github.com",
         "www.github.com",
@@ -42,8 +42,13 @@ def escape_markup(text: str) -> str:
     return (text or "").replace("[", "\\[")
 
 
-def is_safe_github_url(url: str) -> bool:
-    """True only for https URLs on trusted GitHub hosts (no credentials in netloc)."""
+def is_https_host_url(
+    url: str,
+    hosts: Collection[str],
+    *,
+    path_pattern: re.Pattern[str] | None = None,
+) -> bool:
+    """True for https URLs on an allowed host, with no embedded credentials."""
     raw = (url or "").strip()
     if not raw:
         return False
@@ -51,12 +56,20 @@ def is_safe_github_url(url: str) -> bool:
         parsed = urlparse(raw)
     except ValueError:
         return False
-    if parsed.scheme != "https":
-        return False
-    if parsed.username or parsed.password:
+    if parsed.scheme != "https" or parsed.username or parsed.password:
         return False
     host = (parsed.hostname or "").lower()
-    return host in _ALLOWED_URL_HOSTS
+    if host not in hosts:
+        return False
+    if path_pattern is not None:
+        path = (parsed.path or "").rstrip("/")
+        return bool(path_pattern.fullmatch(path))
+    return True
+
+
+def is_safe_github_url(url: str) -> bool:
+    """True only for https URLs on trusted GitHub hosts."""
+    return is_https_host_url(url, _ALLOWED_GITHUB_HOSTS)
 
 
 def open_github_url(url: str) -> bool:
@@ -77,7 +90,7 @@ def user_facing_error(exc: BaseException) -> str:
     if isinstance(exc, RuntimeError):
         msg = str(exc)
         lowered = msg.lower()
-        if "no github token" in lowered or "token" in lowered and "found" in lowered:
+        if "no github token" in lowered or ("token" in lowered and "found" in lowered):
             return "No GitHub token found. Set GITHUB_TOKEN or enter one in setup (u)."
         if "username" in lowered:
             return "No GitHub username configured. Press u to set one."
@@ -90,7 +103,7 @@ def user_facing_error(exc: BaseException) -> str:
         if "github request failed" in lowered or "github 50" in lowered:
             return "GitHub is temporarily unavailable. Try refresh (r)."
         # Avoid dumping raw GraphQL error objects into the UI.
-        if msg.startswith("[") or "messages" in lowered and "type" in lowered:
+        if msg.startswith("[") or ("messages" in lowered and "type" in lowered):
             return "GitHub API returned an error. Check token scopes and try again."
         if len(msg) > 160:
             return msg[:157] + "…"
@@ -102,13 +115,3 @@ def user_facing_error(exc: BaseException) -> str:
     if len(brief) > 160:
         brief = brief[:157] + "…"
     return f"{name}: {brief}"
-
-
-def safe_pr_field(pr: dict[str, Any], *keys: str, default: Any = "") -> Any:
-    """Nested dict get for PR payloads without KeyError."""
-    cur: Any = pr
-    for key in keys:
-        if not isinstance(cur, dict):
-            return default
-        cur = cur.get(key, default)
-    return cur if cur is not None else default

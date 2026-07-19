@@ -19,14 +19,14 @@ from rplusview.github_client import (
     inbox_action_label,
     pr_comments,
 )
-from rplusview.safe import open_github_url, user_facing_error
+from rplusview.safe import escape_markup, open_github_url, user_facing_error
 from rplusview.widget.help_screen import HelpScreen
 from rplusview.widget.status_bar import StatusBar
 from rplusview.widget.title_bar import TitleBar
 from rplusview.widget.vim_nav import VIM_NAV_BINDINGS, VimDataTable, VimNavMixin
 
 
-def _relative_updated(iso: str) -> str:
+def _updated_label(iso: str) -> str:
     if not iso:
         return ""
     return f"Updated {iso[:10]}"
@@ -57,7 +57,6 @@ class InboxScreen(VimNavMixin, Screen):
             "ready": False,
         }
         self._active_section = "drafts"
-        self._pr_by_url: dict[str, dict[str, Any]] = {}
 
     def compose(self) -> ComposeResult:
         yield TitleBar("RPlusView", "inbox")
@@ -114,7 +113,7 @@ class InboxScreen(VimNavMixin, Screen):
         self.query_one("#inbox-loading").display = False
         self.query_one("#inbox-scroll").display = True
         self.query_one("#inbox-header", Static).update(
-            f"[bold red]Failed to load inbox[/]\n[dim]{message}[/]"
+            f"[bold red]Failed to load inbox[/]\n[dim]{escape_markup(message)}[/]"
         )
         self.notify(message, severity="error", timeout=6)
 
@@ -124,7 +123,6 @@ class InboxScreen(VimNavMixin, Screen):
         warnings: list[str] | None = None,
     ) -> None:
         self._inbox = data
-        self._pr_by_url = {}
         total = 0
         for key, _ in INBOX_SECTIONS:
             items = data.get(key) or []
@@ -166,7 +164,6 @@ class InboxScreen(VimNavMixin, Screen):
 
         for pr in items:
             url = pr.get("url") or ""
-            self._pr_by_url[url] = pr
             action = inbox_action_label(pr, section=key)
             checks, check_style = check_summary(pr)
             author = (pr.get("author") or {}).get("login") or ""
@@ -179,7 +176,7 @@ class InboxScreen(VimNavMixin, Screen):
                 Text(action, style=_action_style(action)),
                 Text(checks, style=check_style),
                 str(pr_comments(pr)),
-                _relative_updated(pr.get("updatedAt") or ""),
+                _updated_label(pr.get("updatedAt") or ""),
                 key=url,
             )
 

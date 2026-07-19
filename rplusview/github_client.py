@@ -27,6 +27,7 @@ query($query: String!, $cursor: String) {
         number
         title
         url
+        body
         additions
         deletions
         changedFiles
@@ -37,6 +38,7 @@ query($query: String!, $cursor: String) {
         reviewDecision
         createdAt
         updatedAt
+        headRefName
         author {
           login
         }
@@ -95,12 +97,8 @@ query($owner: String!, $name: String!, $number: Int!) {
       state
       merged
       isDraft
-      mergeable
-      reviewDecision
       createdAt
       updatedAt
-      mergedAt
-      closedAt
       baseRefName
       headRefName
       author {
@@ -122,7 +120,6 @@ query($owner: String!, $name: String!, $number: Int!) {
           }
           body
           createdAt
-          url
         }
       }
       reviewThreads(first: 100) {
@@ -137,7 +134,6 @@ query($owner: String!, $name: String!, $number: Int!) {
               }
               body
               createdAt
-              url
               path
               line
             }
@@ -233,14 +229,6 @@ def require_token() -> str:
     if not token:
         raise RuntimeError("No GitHub token found. Set GITHUB_TOKEN or enter one in setup.")
     return token
-
-
-def get_credentials() -> tuple[str, str]:
-    username = get_username()
-    token = require_token()
-    if not username:
-        raise RuntimeError("No GitHub username configured. Complete setup first.")
-    return username, token
 
 
 def _headers(token: str) -> dict[str, str]:
@@ -352,11 +340,9 @@ def get_inbox(
     authored_open = _search_prs(f"author:{username} type:pr is:open")
     try:
         review_requested = _search_prs(f"review-requested:{username} type:pr is:open")
-    except (RuntimeError, requests.RequestException) as exc:
+    except (RuntimeError, requests.RequestException):
         review_requested = []
         warnings.append("Could not load review requests — check token scopes or rate limits.")
-        # Keep a short internal detail for logs/tests without dumping payloads.
-        _ = str(exc)
 
     sections = categorize_inbox(authored_open, review_requested, username=username)
     return sections, warnings
@@ -562,6 +548,8 @@ def search_prs(prs: list[dict[str, Any]], query: str = "") -> list[dict[str, Any
                 pr.get("repository", {}).get("nameWithOwner") or "",
                 st,
                 (pr.get("author") or {}).get("login") or "",
+                pr.get("headRefName") or "",
+                pr.get("body") or "",
             ]
         ).lower()
         if needle in hay:

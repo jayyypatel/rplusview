@@ -14,6 +14,7 @@ from rplusview.widget.vim_nav import (
 HELP_BODY = """\
 [bold]Toolbar buttons[/bold]
   [bold green]Open[/]        Open selected PR in browser
+  [bold green]Task[/]        Open task-XXXX on odoo.com (if present)
   [bold green]Details[/]     PR details page
   [bold green]Inbox[/]       Pulls inbox (drafts, needs action, …)
   [bold green]Closed[/]      Toggle open ↔ closed/merged PRs
@@ -36,10 +37,11 @@ HELP_BODY = """\
   [bold green]↑ / ↓[/]       Also move between rows
 
 [bold]Search & actions[/bold]
-  [bold green]/[/]           Live search (title, repo, #, status)
+  [bold green]/[/]           Live search (title, repo, #, status, task)
   [bold green]n / N[/]       Next / previous search match
   [bold green]Enter / d[/]   Open PR details
   [bold green]o[/]           Open in browser
+  [bold green]p[/]           Open Odoo task (task-XXXX from title/branch/body)
   [bold green]s[/]           Sort · LOC → Date → Title → Repo → Files → #
   [bold green]i[/]           Inbox panels
   [bold green]c[/]           Toggle closed PRs
@@ -53,6 +55,8 @@ HELP_BODY = """\
 
 [bold]On detail view[/bold]
   Same scroll keys (j/k, gg, G, ctrl+d/u, ctrl+f/b) scroll the page.
+  [bold green]o[/]           Open PR in browser
+  [bold green]p[/]           Open linked Odoo task
 
 [bold]On stats / repos / inbox[/bold]
   Vim table keys apply to the focused table.

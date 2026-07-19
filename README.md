@@ -13,7 +13,7 @@
 
 <p align="center">
   <b>A colorful terminal dashboard for your GitHub pull requests</b><br/>
-  Search · Sort · Inbox · Stats · Repos · Open in browser · First-run setup
+  Search · Sort · Inbox · Stats · Repos · Odoo task links · Open in browser · First-run setup
 </p>
 
 <p align="center">
@@ -57,6 +57,7 @@ RPlusView is a **Textual TUI** that loads your pull requests over the GitHub Gra
 | Inbox | Drafts, needs action, review requests — Pulls-style panels |
 | Navigation | Vim `j`/`k`, `gg`/`G`, page keys, live `/` search |
 | Insights | Stats and per-repo breakdowns (LOC, open/merged/closed) |
+| Odoo tasks | Shows `task-XXXX` from PR title/branch/description; `p` opens on odoo.com |
 | Setup | First-run welcome; change user or token anytime (`u`) |
 
 ---
@@ -144,7 +145,7 @@ Treat the token like a password. Prefer fine-grained tokens with the least acces
 
 ### Toolbar
 
-`Open` · `Details` · `Inbox` · `Closed` · `Stats` · `Repos` · `Search` · `Sort` · `Refresh` · `User` · `Help`
+`Open` · `Task` · `Details` · `Inbox` · `Closed` · `Stats` · `Repos` · `Search` · `Sort` · `Refresh` · `User` · `Help`
 
 ### Keyboard
 
@@ -157,6 +158,7 @@ Treat the token like a password. Prefer fine-grained tokens with the least acces
 | `n` / `N` | Next / previous search match |
 | `Enter` / `d` | PR details |
 | `o` | Open in browser |
+| `p` | Open Odoo task (`task-XXXX` from title / branch / description) |
 | `i` | Inbox |
 | `c` | Toggle open ↔ closed/merged |
 | `/` | Live search |
@@ -201,6 +203,8 @@ rplusview/
 └── rplusview/                  # installable package
     ├── app.py                  # main TUI
     ├── github_client.py        # GraphQL API
+    ├── odoo_task.py            # task-XXXX → odoo.com links
+    ├── safe.py                 # username / URL hardening
     ├── config.py               # saved username / token
     ├── rplusview.tcss
     ├── screens/
