@@ -15,6 +15,7 @@ from textual.widgets import Button, Input, LoadingIndicator, Static
 from rplusview.config import get_saved_username, set_saved_username
 from rplusview.github_client import (
     SORT_MODES,
+    get_pr_detail,
     get_prs,
     get_username,
     pr_comments,
@@ -23,13 +24,20 @@ from rplusview.github_client import (
     search_prs,
     sort_prs,
 )
+from rplusview.odoo_task import open_odoo_task, pr_task_id, pr_task_label, title_without_task
 from rplusview.safe import open_github_url, user_facing_error, validate_github_username
 from rplusview.screens import InboxScreen, PRDetailScreen, ReposScreen, StatsScreen
-from rplusview.widget import ActionBar, HelpScreen, StatusBar, TitleBar, VimDataTable
-from rplusview.widget.setup_screen import SetupScreen
+from rplusview.widget import ActionBar, HelpScreen, SetupScreen, StatusBar, TitleBar, VimDataTable
 from rplusview.widget.vim_nav import VIM_NAV_BINDINGS, VimNavMixin
 
 PRFilter = Literal["open", "closed"]
+
+
+def _task_cell(pr: dict[str, Any]) -> Text:
+    label = pr_task_label(pr)
+    if not label:
+        return Text("—", style="#8b9bb0")
+    return Text(label, style="bold #d29922")
 
 
 def _status_cell(status: str) -> Text:
@@ -67,6 +75,7 @@ class RPlusView(VimNavMixin, App):
         Binding("slash", "focus_search", "Search", show=False),
         Binding("s", "cycle_sort", "Sort", show=False),
         Binding("o", "open_browser", "Browser", show=False),
+        Binding("p", "open_odoo_task", "Task", show=False),
         Binding("d", "open_details", "Details", show=False),
         Binding("t", "open_stats", "Stats", show=False),
         Binding("e", "open_repos", "Repos", show=False),
@@ -111,6 +120,7 @@ class RPlusView(VimNavMixin, App):
             "#",
             "Repository",
             "Title",
+            "Task",
             "+",
             "-",
             "LOC",
@@ -190,6 +200,61 @@ class RPlusView(VimNavMixin, App):
             return
         self.notify(f"Opened #{pr.get('number')} in browser", timeout=2)
 
+    def action_open_odoo_task(self) -> None:
+        pr = self._selected_pr()
+        if not pr:
+            return
+        task_id = pr_task_id(pr)
+        if task_id:
+            self._open_task_id(task_id)
+            return
+        # List payload may omit body; fetch details then open.
+        self.notify("Looking up task in PR description…", timeout=1.5)
+        self.resolve_odoo_task(pr)
+
+    def _open_task_id(self, task_id: str) -> None:
+        if not open_odoo_task(task_id):
+            self.notify("Could not open Odoo task URL", severity="error", timeout=3)
+            return
+        self.notify(f"Opened task-{task_id} on Odoo", timeout=2)
+
+    def _merge_pr_cache(self, pr: dict[str, Any], detail: dict[str, Any]) -> None:
+        """Update the in-memory PR so Task column / later opens see the body."""
+        patch = {
+            key: detail[key]
+            for key in ("body", "title", "headRefName")
+            if detail.get(key) is not None
+        }
+        if not patch:
+            return
+        pr.update(patch)
+        url = pr.get("url")
+        if not url:
+            return
+        for i, cached in enumerate(self._prs):
+            if cached.get("url") == url:
+                self._prs[i] = {**cached, **patch}
+                break
+
+    @work(exclusive=True, thread=True)
+    def resolve_odoo_task(self, pr: dict[str, Any]) -> None:
+        detail = get_pr_detail(pr)
+        task_id = pr_task_id(detail)
+        self.call_from_thread(self._on_odoo_task_resolved, pr, detail, task_id)
+
+    def _on_odoo_task_resolved(
+        self,
+        pr: dict[str, Any],
+        detail: dict[str, Any],
+        task_id: str | None,
+    ) -> None:
+        self._merge_pr_cache(pr, detail)
+        self._render_table()
+        if not task_id:
+            self.notify("No task-XXXX found in this PR", severity="warning", timeout=2)
+            return
+        self._open_task_id(task_id)
+
     def action_open_details(self) -> None:
         pr = self._selected_pr()
         if pr:
@@ -241,6 +306,7 @@ class RPlusView(VimNavMixin, App):
     def on_button_pressed(self, event: Button.Pressed) -> None:
         actions = {
             "btn-open": self.action_open_browser,
+            "btn-task": self.action_open_odoo_task,
             "btn-details": self.action_open_details,
             "btn-inbox": self.action_open_inbox,
             "btn-closed": self.action_toggle_closed,
@@ -357,7 +423,7 @@ class RPlusView(VimNavMixin, App):
         for pr in visible:
             status = pr_status(pr)
             repo = (pr.get("repository") or {}).get("nameWithOwner") or "?"
-            title = pr.get("title") or "(no title)"
+            title = title_without_task(pr.get("title"))
             number = pr.get("number") or 0
             created = str(pr.get("createdAt") or "")[:10]
             url = pr.get("url") or f"{repo}#{number}"
@@ -365,6 +431,7 @@ class RPlusView(VimNavMixin, App):
                 Text(f"#{number}", style="bold"),
                 repo,
                 title,
+                _task_cell(pr),
                 _diff_cell(int(pr.get("additions") or 0), "+"),
                 _diff_cell(int(pr.get("deletions") or 0), "-"),
                 str(pr_loc(pr)),

@@ -23,6 +23,7 @@ from rplusview.github_client import (
     pr_review_comments,
     pr_status,
 )
+from rplusview.odoo_task import open_odoo_task, pr_task_id, pr_task_label
 from rplusview.safe import escape_markup, open_github_url
 from rplusview.screens.inbox import InboxScreen
 from rplusview.widget.help_screen import HelpScreen
@@ -39,15 +40,6 @@ from rplusview.widget.vim_nav import (
 )
 
 __all__ = ["InboxScreen", "PRDetailScreen", "ReposScreen", "StatsScreen"]
-
-
-def _open_url(url: str) -> bool:
-    return open_github_url(url)
-
-
-def _escape_markup(text: str) -> str:
-    """Escape Rich markup brackets in user content."""
-    return escape_markup(text)
 
 
 def _trim_body(text: str, limit: int = 600) -> str:
@@ -71,9 +63,9 @@ def _format_comments(pr: dict[str, Any]) -> str:
 
     blocks: list[str] = []
     for i, node in enumerate(comments, start=1):
-        author = _escape_markup((node.get("author") or {}).get("login") or "unknown")
-        created = _escape_markup(str(node.get("createdAt") or "")[:10])
-        body = _escape_markup(_trim_body(node.get("body") or ""))
+        author = escape_markup((node.get("author") or {}).get("login") or "unknown")
+        created = escape_markup(str(node.get("createdAt") or "")[:10])
+        body = escape_markup(_trim_body(node.get("body") or ""))
         if not body:
             body = "[dim]_empty comment_[/]"
         blocks.append(
@@ -103,13 +95,13 @@ def _format_inline_comments(pr: dict[str, Any]) -> str:
 
     blocks: list[str] = []
     for i, node in enumerate(nodes[:40], start=1):
-        author = _escape_markup((node.get("author") or {}).get("login") or "unknown")
-        created = _escape_markup(str(node.get("createdAt") or "")[:10])
-        path = _escape_markup(node.get("path") or "")
+        author = escape_markup((node.get("author") or {}).get("login") or "unknown")
+        created = escape_markup(str(node.get("createdAt") or "")[:10])
+        path = escape_markup(node.get("path") or "")
         line = node.get("line")
         loc = f"{path}:{line}" if path and line else path or "diff"
         resolved = " [dim]resolved[/]" if node.get("_resolved") else ""
-        body = _escape_markup(_trim_body(node.get("body") or "", 450))
+        body = escape_markup(_trim_body(node.get("body") or "", 450))
         if not body:
             body = "[dim]_empty comment_[/]"
         blocks.append(
@@ -144,11 +136,11 @@ def _format_reviews(pr: dict[str, Any]) -> str:
     }
     blocks: list[str] = []
     for node in useful[:15]:
-        author = _escape_markup((node.get("author") or {}).get("login") or "unknown")
-        state = _escape_markup(node.get("state") or "COMMENTED")
+        author = escape_markup((node.get("author") or {}).get("login") or "unknown")
+        state = escape_markup(node.get("state") or "COMMENTED")
         color = state_colors.get(state, "#8b9bb0")
-        created = _escape_markup(str(node.get("createdAt") or "")[:10])
-        body = _escape_markup(_trim_body(node.get("body") or "", 400))
+        created = escape_markup(str(node.get("createdAt") or "")[:10])
+        body = escape_markup(_trim_body(node.get("body") or "", 400))
         blocks.append(
             f"[bold {color}]● {state}[/]  [bold #a371f7]@{author}[/]  "
             f"[dim]{created}[/]\n"
@@ -164,6 +156,7 @@ class PRDetailScreen(Screen):
         Binding("escape", "go_back", "Back", show=False),
         Binding("q", "go_back", "Back", show=False),
         Binding("o", "open_browser", "Browser", show=False),
+        Binding("p", "open_odoo_task", "Task", show=False),
         Binding("question_mark", "help", "Help", show=False),
         Binding("g,g", "scroll_top", "Top", show=False, priority=True),
         Binding("G", "scroll_bottom", "Bottom", show=False, priority=True),
@@ -201,7 +194,7 @@ class PRDetailScreen(Screen):
     def on_mount(self) -> None:
         self.query_one("#detail-scroll").display = False
         self.query_one(StatusBar).set_message(
-            " j/k gg G  ctrl+d/u  ctrl+f/b scroll   o Open   Esc/q Back   ? Help "
+            " j/k gg G  ctrl+d/u  ctrl+f/b scroll   o Open   p Task   Esc/q Back   ? Help "
         )
         self.fetch_detail()
 
@@ -259,21 +252,28 @@ class PRDetailScreen(Screen):
         status = pr_status(pr)
         labels = (
             ", ".join(
-                _escape_markup(n.get("name") or "")
+                escape_markup(n.get("name") or "")
                 for n in (pr.get("labels") or {}).get("nodes") or []
             )
             or "—"
         )
-        author = _escape_markup((pr.get("author") or {}).get("login") or "—")
+        author = escape_markup((pr.get("author") or {}).get("login") or "—")
         body = (pr.get("body") or "").strip() or "_No description provided._"
         if len(body) > 4000:
             body = body[:4000] + "\n\n…"
-        body = _escape_markup(body)
+        body = escape_markup(body)
 
-        repo = _escape_markup(pr.get("repository", {}).get("nameWithOwner") or "—")
-        head = _escape_markup(pr.get("headRefName") or "—")
-        base = _escape_markup(pr.get("baseRefName") or "—")
-        url = _escape_markup(pr.get("url") or "")
+        repo = escape_markup(pr.get("repository", {}).get("nameWithOwner") or "—")
+        head = escape_markup(pr.get("headRefName") or "—")
+        base = escape_markup(pr.get("baseRefName") or "—")
+        url = escape_markup(pr.get("url") or "")
+        task_label = pr_task_label(pr)
+        task_line = (
+            f"[bold #3dd68c]Task[/]      [bold #d29922]{escape_markup(task_label)}[/]  "
+            f"[dim](press p to open on Odoo)[/]\n"
+            if task_label
+            else ""
+        )
         commits = (pr.get("commits") or {}).get("totalCount", "—")
         issue_n = pr_issue_comments(pr)
         review_n = pr_review_comments(pr)
@@ -287,13 +287,14 @@ class PRDetailScreen(Screen):
         }.get(status, "#8b9bb0")
 
         self.query_one("#detail-header", Static).update(
-            f"[bold]{_escape_markup(pr.get('title', ''))}[/bold]\n"
+            f"[bold]{escape_markup(pr.get('title', ''))}[/bold]\n"
             f"[dim]{repo} · #{pr.get('number')} · [/]"
             f"[bold {status_color}]{status}[/]"
         )
         self.query_one("#detail-meta", Static).update(
             f"[bold #3dd68c]Author[/]    [bold]@{author}[/]\n"
             f"[bold #3dd68c]Branch[/]    {head} → {base}\n"
+            f"{task_line}"
             f"[bold #3dd68c]Diff[/]      [green]+{pr.get('additions', 0)}[/]  "
             f"[red]-{pr.get('deletions', 0)}[/]  ·  "
             f"{pr.get('changedFiles', 0)} files  ·  LOC {pr_loc(pr)}\n"
@@ -325,18 +326,29 @@ class PRDetailScreen(Screen):
 
         self.query_one("#detail-loading").display = False
         self.query_one("#detail-scroll").display = True
-        self.query_one(TitleBar).set_meta(
-            f"PR #{pr.get('number')} · {status} · {comments_n} comments"
-        )
+        meta_bits = [f"PR #{pr.get('number')}", status, f"{comments_n} comments"]
+        if task_label:
+            meta_bits.insert(1, task_label)
+        self.query_one(TitleBar).set_meta(" · ".join(meta_bits))
 
     def action_go_back(self) -> None:
         self.app.pop_screen()
 
     def action_open_browser(self) -> None:
-        if not _open_url(self.pr.get("url") or ""):
+        if not open_github_url(self.pr.get("url") or ""):
             self.notify("Blocked non-GitHub URL", severity="warning", timeout=3)
             return
         self.notify("Opened in browser", timeout=2)
+
+    def action_open_odoo_task(self) -> None:
+        task_id = pr_task_id(self.pr)
+        if not task_id:
+            self.notify("No task-XXXX found in this PR", severity="warning", timeout=2)
+            return
+        if not open_odoo_task(task_id):
+            self.notify("Could not open Odoo task URL", severity="error", timeout=3)
+            return
+        self.notify(f"Opened task-{task_id} on Odoo", timeout=2)
 
     def action_help(self) -> None:
         self.app.push_screen(HelpScreen())
@@ -355,9 +367,10 @@ class StatsScreen(VimNavMixin, Screen):
     def __init__(self, prs: list[dict[str, Any]]) -> None:
         super().__init__()
         self.prs = prs
+        self._stats = compute_stats(prs)
 
     def compose(self) -> ComposeResult:
-        stats = compute_stats(self.prs)
+        stats = self._stats
         yield TitleBar("RPlusView", "statistics")
         with Vertical(id="stats-body"):
             yield Static(
@@ -381,7 +394,7 @@ class StatsScreen(VimNavMixin, Screen):
         yield StatusBar()
 
     def on_mount(self) -> None:
-        stats = compute_stats(self.prs)
+        stats = self._stats
         repos = self.query_one("#stats-top-repos", VimDataTable)
         repos.cursor_type = "row"
         repos.zebra_stripes = True
@@ -394,13 +407,16 @@ class StatsScreen(VimNavMixin, Screen):
         largest.zebra_stripes = True
         largest.add_columns("#", "Repository", "Title", "LOC", "Status")
         for pr in stats["largest"]:
+            repo = (pr.get("repository") or {}).get("nameWithOwner") or "?"
+            title = (pr.get("title") or "")[:48]
+            url = pr.get("url") or f"{repo}#{pr.get('number') or 0}"
             largest.add_row(
-                f"#{pr['number']}",
-                pr["repository"]["nameWithOwner"],
-                pr["title"][:48],
+                f"#{pr.get('number') or 0}",
+                repo,
+                title,
                 str(pr_loc(pr)),
                 pr_status(pr),
-                key=pr["url"],
+                key=url,
             )
 
         self.query_one(StatusBar).set_message(" j/k gg G  ctrl+d/u  Esc/q Back   ? Help ")
@@ -478,7 +494,7 @@ class ReposScreen(VimNavMixin, Screen):
 
     @on(VimDataTable.RowSelected, "#repos-table")
     def on_data_table_row_selected(self, event: VimDataTable.RowSelected) -> None:
-        if not _open_url(str(event.row_key.value)):
+        if not open_github_url(str(event.row_key.value)):
             self.notify("Blocked non-GitHub URL", severity="warning", timeout=3)
             return
         self.notify("Opened repository in browser", timeout=2)
@@ -491,7 +507,7 @@ class ReposScreen(VimNavMixin, Screen):
         if table.row_count == 0:
             return
         row_key, _ = table.coordinate_to_cell_key(table.cursor_coordinate)
-        if not _open_url(str(row_key.value)):
+        if not open_github_url(str(row_key.value)):
             self.notify("Blocked non-GitHub URL", severity="warning", timeout=3)
             return
         self.notify("Opened repository in browser", timeout=2)

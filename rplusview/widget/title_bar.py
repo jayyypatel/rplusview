@@ -1,5 +1,7 @@
 from textual.widgets import Static
 
+from rplusview.safe import escape_markup
+
 APP_NAME = "RPlusView"
 
 
@@ -14,5 +16,7 @@ class TitleBar(Static):
         super().__init__(label, id="title-bar")
 
     def set_meta(self, text: str) -> None:
+        # Escape untrusted bits (e.g. live search query) so Rich markup cannot inject.
+        safe = escape_markup(text) if text else ""
         base = f"  ◆  {self._title}  "
-        self.update(f"{base}—  {text}  " if text else base)
+        self.update(f"{base}—  {safe}  " if safe else base)

@@ -9,6 +9,7 @@ class ActionBar(Horizontal):
     def compose(self) -> ComposeResult:
         yield Static(" Actions ", id="action-label")
         yield Button("Open", id="btn-open", variant="success", flat=True, compact=True)
+        yield Button("Task", id="btn-task", variant="warning", flat=True, compact=True)
         yield Button("Details", id="btn-details", variant="primary", flat=True, compact=True)
         yield Button("Inbox", id="btn-inbox", variant="primary", flat=True, compact=True)
         yield Button("Closed", id="btn-closed", variant="default", flat=True, compact=True)
